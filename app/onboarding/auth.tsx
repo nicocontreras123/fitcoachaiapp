@@ -1,7 +1,7 @@
 import { View, StyleSheet, Alert } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Text, Button, TextInput, Surface, useTheme } from 'react-native-paper';
+import { Text, Button, TextInput, useTheme } from 'react-native-paper';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuth } from '@/contexts/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -52,10 +52,10 @@ export default function AuthScreen() {
 
       } else {
         await signUpWithEmail(email, password);
-        Alert.alert(
-          'Éxito',
-          'Cuenta creada. Por favor verifica tu email antes de iniciar sesión.',
-        );
+        console.log('✅ Registro exitoso - navegando al onboarding');
+
+        // Navegar directamente al onboarding después del registro
+        router.replace('/onboarding/personal-info');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Algo salió mal');
@@ -68,6 +68,21 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       await signInWithGoogle();
+      console.log('✅ Google Sign In exitoso');
+
+      // Verificar si el usuario necesita completar el onboarding
+      try {
+        const user: any = await api.getCurrentUser();
+
+        if (!user || !user.height || !user.weight || !user.fitness_level || !user.goal) {
+          router.replace('/onboarding/personal-info');
+        } else {
+          router.replace('/(tabs)');
+        }
+      } catch (fetchError) {
+        console.error('Error obteniendo datos del usuario:', fetchError);
+        router.replace('/onboarding/personal-info');
+      }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Algo salió mal con Google');
     } finally {

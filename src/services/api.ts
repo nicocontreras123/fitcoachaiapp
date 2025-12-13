@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { authApi } from './auth-api';
 import Constants from 'expo-constants';
 
 const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
@@ -6,17 +6,17 @@ const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL || 'http://10.0
 console.log('🌐 API URL configurada:', API_URL);
 
 async function getAuthHeaders() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const token = await authApi.getToken();
 
-  console.log('🔑 Session status:', session ? 'Existe' : 'No existe');
-  console.log('🔑 Access token:', session?.access_token ? `${session.access_token.substring(0, 20)}...` : 'No hay token');
+  console.log('🔑 Token status:', token ? 'Existe' : 'No existe');
+  console.log('🔑 Access token:', token ? `${token.substring(0, 20)}...` : 'No hay token');
 
-  if (!session?.access_token) {
-    throw new Error('No authentication token');
+  if (!token) {
+    return null;
   }
 
   return {
-    'Authorization': `Bearer ${session.access_token}`,
+    'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
   };
 }
@@ -25,12 +25,24 @@ export const api = {
   async getCurrentUser() {
     try {
       const headers = await getAuthHeaders();
+
+      if (!headers) {
+        throw new Error('NOT_AUTHENTICATED');
+      }
+
       console.log('📡 Fetching user from:', `${API_URL}/users/me`);
-      const response = await fetch(`${API_URL}/users/me`, { headers });
+
+      // Create timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), 5000); // 5 second timeout
+      });
+
+      const fetchPromise = fetch(`${API_URL}/users/me`, { headers });
+
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
       if (response.status === 401) {
-        console.error('❌ Unauthorized - clearing session');
-        // Clear the session
-        await supabase.auth.signOut();
+        console.error('❌ Unauthorized - backend rejected token');
         throw new Error('UNAUTHORIZED');
       }
       if (!response.ok) {
@@ -38,7 +50,10 @@ export const api = {
         throw new Error('Failed to fetch user');
       }
       return response.json();
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === 'TIMEOUT') {
+        console.log('⏱️ Request timeout - backend not responding');
+      }
       console.error('❌ Error fetching user:', error);
       throw error;
     }
@@ -46,6 +61,8 @@ export const api = {
 
   async updateUser(data: any) {
     const headers = await getAuthHeaders();
+    if (!headers) throw new Error('NOT_AUTHENTICATED');
+
     const response = await fetch(`${API_URL}/users/me`, {
       method: 'PUT',
       headers,
@@ -57,6 +74,8 @@ export const api = {
 
   async createWorkout(data: any) {
     const headers = await getAuthHeaders();
+    if (!headers) throw new Error('NOT_AUTHENTICATED');
+
     const response = await fetch(`${API_URL}/workouts`, {
       method: 'POST',
       headers,
@@ -68,6 +87,8 @@ export const api = {
 
   async getWorkouts(type?: string) {
     const headers = await getAuthHeaders();
+    if (!headers) throw new Error('NOT_AUTHENTICATED');
+
     const url = type ? `${API_URL}/workouts?type=${type}` : `${API_URL}/workouts`;
     const response = await fetch(url, { headers });
     if (!response.ok) throw new Error('Failed to fetch workouts');
@@ -76,6 +97,8 @@ export const api = {
 
   async getWorkout(id: string) {
     const headers = await getAuthHeaders();
+    if (!headers) throw new Error('NOT_AUTHENTICATED');
+
     const response = await fetch(`${API_URL}/workouts/${id}`, { headers });
     if (!response.ok) throw new Error('Failed to fetch workout');
     return response.json();
@@ -83,6 +106,8 @@ export const api = {
 
   async updateWorkout(id: string, data: any) {
     const headers = await getAuthHeaders();
+    if (!headers) throw new Error('NOT_AUTHENTICATED');
+
     const response = await fetch(`${API_URL}/workouts/${id}`, {
       method: 'PUT',
       headers,
@@ -94,6 +119,8 @@ export const api = {
 
   async deleteWorkout(id: string) {
     const headers = await getAuthHeaders();
+    if (!headers) throw new Error('NOT_AUTHENTICATED');
+
     const response = await fetch(`${API_URL}/workouts/${id}`, {
       method: 'DELETE',
       headers,
@@ -104,6 +131,8 @@ export const api = {
 
   async getCompletedWorkouts() {
     const headers = await getAuthHeaders();
+    if (!headers) throw new Error('NOT_AUTHENTICATED');
+
     const response = await fetch(`${API_URL}/workouts/completed`, { headers });
     if (!response.ok) throw new Error('Failed to fetch completed workouts');
     return response.json();

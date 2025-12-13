@@ -85,14 +85,14 @@ function TabBarIcon({ name, color, focused }: TabBarIconProps) {
 export default function TabsLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const { session, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !session) {
+    if (!loading && !user) {
       router.replace('/onboarding/welcome');
     }
-  }, [session, loading, router]);
+  }, [user, loading, router]);
 
   if (loading) {
     return (

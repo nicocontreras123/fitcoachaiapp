@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/services/supabase';
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 
@@ -56,7 +55,6 @@ export const useBoxeoTimer = (sessionId: string, config?: TimerConfig) => {
         totalRounds: totalRounds,
     });
 
-    const channelRef = useRef<any>(null);
     const hasSpokenCountdownRef = useRef<Set<number>>(new Set());
     const tickSoundRef = useRef<Audio.Sound | null>(null);
     const bellSoundRef = useRef<Audio.Sound | null>(null);
@@ -184,20 +182,6 @@ export const useBoxeoTimer = (sessionId: string, config?: TimerConfig) => {
     }, [state.timeLeft, state.isActive, state.round, state.isRest, state.isPreparing]);
 
     useEffect(() => {
-        // Supabase Realtime Sync
-        channelRef.current = supabase
-            .channel(`boxeo_timer:${sessionId}`)
-            .on('broadcast', { event: 'sync_timer' }, ({ payload }) => {
-                setState(prev => ({ ...prev, ...payload }));
-            })
-            .subscribe();
-
-        return () => {
-            if (channelRef.current) supabase.removeChannel(channelRef.current);
-        };
-    }, [sessionId]);
-
-    useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
         if (state.isActive && state.timeLeft > 0) {
             interval = setInterval(() => {
@@ -292,11 +276,6 @@ export const useBoxeoTimer = (sessionId: string, config?: TimerConfig) => {
     const updateState = (updates: Partial<TimerState>) => {
         setState(prev => {
             const next = { ...prev, ...updates };
-            channelRef.current?.send({
-                type: 'broadcast',
-                event: 'sync_timer',
-                payload: next,
-            });
             return next;
         });
     };

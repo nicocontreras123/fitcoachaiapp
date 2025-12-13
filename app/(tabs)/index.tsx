@@ -7,8 +7,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Text, Surface, TouchableRipple, useTheme, Button } from 'react-native-paper';
 
-import { supabase } from '@/services/supabase';
-
 export default function Dashboard() {
   const router = useRouter();
   const { currentWeeklyRoutine } = useWorkoutStore();
