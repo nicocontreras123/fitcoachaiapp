@@ -1,0 +1,31 @@
+node_modules/
+.expo/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Android
+android/.gradle
+android/app/build
+android/build
+android/app/src/main/assets/
+android/app/src/main/res/raw/
+
+# iOS
+ios/Pods/
+ios/build/
+ios/*.xcworkspace
+ios/*.xcodeproj/project.xcworkspace
+ios/*.xcodeproj/xcuserdata
+
+*.jks
+*.keystore

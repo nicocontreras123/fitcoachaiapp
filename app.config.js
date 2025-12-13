@@ -1,0 +1,69 @@
+export default ({ config }) => ({
+    ...config,
+    name: "FitCoach AI",
+    slug: "fitcoach-ai",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "automatic",
+    splash: {
+        image: "./assets/splash.png",
+        resizeMode: "contain",
+        backgroundColor: "#0ea5e9"
+    },
+    assetBundlePatterns: [
+        "**/*"
+    ],
+    ios: {
+        supportsTablet: true,
+        bundleIdentifier: "com.fitcoach.ai",
+        infoPlist: {
+            NSLocationWhenInUseUsageDescription: "FitCoach AI needs your location to track your running workouts and provide accurate distance and pace information.",
+            NSMicrophoneUsageDescription: "FitCoach AI needs microphone access to provide voice feedback during your workouts."
+        }
+    },
+    android: {
+        adaptiveIcon: {
+            foregroundImage: "./assets/adaptive-icon.png",
+            backgroundColor: "#ffffff"
+        },
+        package: "com.fitcoach.ai",
+        permissions: [
+            "ACCESS_FINE_LOCATION",
+            "ACCESS_COARSE_LOCATION",
+            "ACCESS_BACKGROUND_LOCATION",
+            "FOREGROUND_SERVICE",
+            "FOREGROUND_SERVICE_LOCATION",
+            "RECORD_AUDIO"
+        ]
+    },
+    web: {
+        favicon: "./assets/favicon.png"
+    },
+    plugins: [
+        "expo-router",
+        [
+            "expo-location",
+            {
+                locationAlwaysAndWhenInUsePermission: "Allow FitCoach AI to use your location to track running workouts."
+            }
+        ],
+        "expo-font",
+        "expo-web-browser"
+    ],
+    scheme: "fitcoach",
+    experiments: {
+        typedRoutes: true
+    },
+    extra: {
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+        OPENAI_API_BASE_URL: process.env.OPENAI_API_BASE_URL,
+        OPENAI_MODEL: process.env.OPENAI_MODEL,
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+        EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+        EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+        EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+        EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL
+    }
+});

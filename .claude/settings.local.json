@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(frontend-design)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(npm install)",
+      "Bash(npx expo start:*)",
+      "Bash(npm install:*)",
+      "Bash(npm start)"
+    ]
+  }
+}
