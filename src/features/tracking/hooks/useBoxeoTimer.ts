@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, AudioSource } from 'expo-audio';
 
 interface TimerState {
     isActive: boolean;
@@ -56,106 +56,48 @@ export const useBoxeoTimer = (sessionId: string, config?: TimerConfig) => {
     });
 
     const hasSpokenCountdownRef = useRef<Set<number>>(new Set());
-    const tickSoundRef = useRef<Audio.Sound | null>(null);
-    const bellSoundRef = useRef<Audio.Sound | null>(null);
+    const tickPlayer = useAudioPlayer(require('../../../../assets/tictac.mp3') as AudioSource, { loop: true });
+    const bellPlayer = useAudioPlayer(require('../../../../assets/campana.mp3') as AudioSource);
     const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Load sounds once on mount
+    // Set audio player volumes
     useEffect(() => {
-        const loadSounds = async () => {
-            try {
-                // Configure audio mode
-                await Audio.setAudioModeAsync({
-                    playsInSilentModeIOS: true,
-                    staysActiveInBackground: false,
-                    shouldDuckAndroid: false,
-                });
-
-                // Load the tick sound
-                const { sound: tickSound } = await Audio.Sound.createAsync(
-                    require('../../../../assets/tictac.mp3'),
-                    {
-                        shouldPlay: false,
-                        volume: 0.8,
-                        isLooping: true // Loop the sound continuously
-                    }
-                );
-                tickSoundRef.current = tickSound;
-                console.log('Tick sound loaded successfully with volume:', 0.8);
-
-                // Load the bell sound
-                const { sound: bellSound } = await Audio.Sound.createAsync(
-                    require('../../../../assets/campana.mp3'),
-                    {
-                        shouldPlay: false,
-                        volume: 1.0,
-                        isLooping: false
-                    }
-                );
-                bellSoundRef.current = bellSound;
-                console.log('Bell sound loaded successfully');
-            } catch (error) {
-                console.error('Error loading sounds:', error);
-            }
-        };
-
-        loadSounds();
-
-        // Cleanup on unmount
-        return () => {
-            if (tickSoundRef.current) {
-                tickSoundRef.current.unloadAsync().catch(() => { });
-            }
-            if (bellSoundRef.current) {
-                bellSoundRef.current.unloadAsync().catch(() => { });
-            }
-        };
+        tickPlayer.volume = 0.8;
+        bellPlayer.volume = 1.0;
     }, []);
 
     // Play/pause tick-tack sound based on timer state
     useEffect(() => {
-        const startTickSound = async () => {
-            if (tickSoundRef.current) {
-                try {
-                    const status = await tickSoundRef.current.getStatusAsync();
-                    if (status.isLoaded && !status.isPlaying) {
-                        await tickSoundRef.current.playAsync();
-                        console.log('Tick sound started (looping)');
-                    }
-                } catch (error) {
-                    console.log('Error starting tick sound:', error);
-                }
-            }
-        };
-
-        const stopTickSound = async () => {
-            if (tickSoundRef.current) {
-                try {
-                    const status = await tickSoundRef.current.getStatusAsync();
-                    if (status.isLoaded && status.isPlaying) {
-                        await tickSoundRef.current.stopAsync();
-                        console.log('Tick sound stopped');
-                    }
-                } catch (error) {
-                    console.log('Error stopping tick sound:', error);
-                }
-            }
-        };
-
-        // Verificar si los sonidos están habilitados
         const soundsEnabled = config?.timerSoundEnabled !== false;
 
-        // Reproducir tictac cuando está activo (incluyendo preparación) Y sonidos habilitados
         if (state.isActive && soundsEnabled) {
-            console.log('Starting tick sound - timer is active');
-            startTickSound();
+
+            try {
+                if (tickPlayer && !tickPlayer.playing) {
+                    tickPlayer.play();
+                }
+            } catch (error) {
+                console.error('Error playing tick sound:', error);
+            }
         } else {
-            console.log('Timer paused - stopping tick sound');
-            stopTickSound();
+
+            try {
+                if (tickPlayer && tickPlayer.playing) {
+                    tickPlayer.pause();
+                }
+            } catch (error) {
+                console.error('Error pausing tick sound:', error);
+            }
         }
 
         return () => {
-            stopTickSound();
+            try {
+                if (tickPlayer && tickPlayer.playing) {
+                    tickPlayer.pause();
+                }
+            } catch (error) {
+                // Silently ignore cleanup errors
+            }
         };
     }, [state.isActive, config?.timerSoundEnabled]);
 
@@ -252,24 +194,19 @@ export const useBoxeoTimer = (sessionId: string, config?: TimerConfig) => {
         }
     };
 
-    const playBellSound = async () => {
+    const playBellSound = () => {
         // Verificar si los sonidos están habilitados
         if (config?.timerSoundEnabled === false) {
-            console.log('Bell sound disabled by user');
+
             return;
         }
 
-        if (bellSoundRef.current) {
-            try {
-                // Stop and rewind to beginning
-                await bellSoundRef.current.stopAsync();
-                await bellSoundRef.current.setPositionAsync(0);
-                // Play the bell
-                await bellSoundRef.current.playAsync();
-                console.log('Bell sound played');
-            } catch (error) {
-                console.error('Error playing bell sound:', error);
-            }
+        try {
+            bellPlayer.seekTo(0);
+            bellPlayer.play();
+
+        } catch (error) {
+            console.error('Error playing bell sound:', error);
         }
     };
 
@@ -280,7 +217,10 @@ export const useBoxeoTimer = (sessionId: string, config?: TimerConfig) => {
         });
     };
 
-    const toggleTimer = () => updateState({ isActive: !state.isActive });
+    const toggleTimer = () => {
+
+        updateState({ isActive: !state.isActive });
+    };
 
     const resetTimer = () => updateState({
         round: 1,

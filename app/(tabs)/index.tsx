@@ -1,185 +1,287 @@
-import React from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useWorkoutStore } from '@/features/workouts/store/useWorkoutStore';
-import { useUserStore } from '@/features/profile/store/userStore';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useMemo } from 'react';
+import { View, ScrollView, StyleSheet, Text, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Text, Surface, TouchableRipple, useTheme, Button } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useUserStore } from '@/features/profile/store/userStore';
+import { useWorkoutStore } from '@/features/workouts/store/useWorkoutStore';
+import { COLORS } from '@/constants/theme';
 
-export default function Dashboard() {
+const DAY_MAP: Record<string, string> = {
+  'monday': 'lunes',
+  'tuesday': 'martes',
+  'wednesday': 'miércoles',
+  'thursday': 'jueves',
+  'friday': 'viernes',
+  'saturday': 'sábado',
+  'sunday': 'domingo',
+};
+
+const REVERSE_DAY_MAP: Record<string, string> = {
+  'lunes': 'monday',
+  'martes': 'tuesday',
+  'miércoles': 'wednesday',
+  'jueves': 'thursday',
+  'viernes': 'friday',
+  'sábado': 'saturday',
+  'domingo': 'sunday',
+};
+
+export default function DashboardScreen() {
   const router = useRouter();
-  const { currentWeeklyRoutine } = useWorkoutStore();
-  const { clearUserData } = useUserStore();
-  const theme = useTheme();
+  const { userData } = useUserStore();
+  const { currentWeeklyRoutine, setCurrentWorkout, loadWeeklyRoutine } = useWorkoutStore();
 
-  const handleTestSupabase = async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      Alert.alert("Conexión Exitosa", "Supabase está conectado correctamente. Sesión: " + (data.session ? "Activa" : "Inactiva"));
-    } catch (e: any) {
-      Alert.alert("Error de Conexión", e.message);
+  // Cargar rutina al montar el componente
+  React.useEffect(() => {
+    if (!currentWeeklyRoutine) {
+
+      loadWeeklyRoutine();
     }
-  };
+  }, []);
 
-  const handleTestLogin = async () => {
+
+
+
+  // Find next available workout
+  const nextWorkout = useMemo(() => {
     try {
-      const email = `test_${Math.floor(Math.random() * 1000)}@fitcoach.com`;
-      const password = 'password123';
+      if (!currentWeeklyRoutine?.days) {
 
-      // Try sign up first
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        // If user likely exists (or different error), try sign in
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-        if (signInError) throw signInError;
-        Alert.alert("Login Exitoso", `Sesión iniciada con ${signInData.user?.email}`);
-        return;
+        return null;
       }
 
-      Alert.alert("Registro Exitoso", `Usuario de prueba creado: ${data.user?.email}`);
+      const today = new Date().toLocaleDateString('es-CL', { weekday: 'long' }).toLowerCase();
+      const daysOfWeek = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 
-    } catch (e: any) {
-      Alert.alert("Error Login", e.message);
+      // Find today's index
+      const todayIndex = daysOfWeek.indexOf(today);
+
+      // Check from today onwards
+      for (let i = 0; i < 7; i++) {
+        const dayIndex = (todayIndex + i) % 7;
+        const dayName = daysOfWeek[dayIndex];
+        const dayData = currentWeeklyRoutine.days[dayName];
+
+        if (dayData && !dayData.restDay && dayData.workout) {
+
+          return {
+            dayName,
+            dayKey: REVERSE_DAY_MAP[dayName] || dayName,
+            ...dayData,
+          };
+        }
+      }
+
+
+      return null;
+    } catch (error) {
+      console.error('[Dashboard] Error finding next workout:', error);
+      return null;
+    }
+  }, [currentWeeklyRoutine]);
+
+  const handleStartWorkout = () => {
+    if (nextWorkout?.workout) {
+      setCurrentWorkout(nextWorkout.workout);
+      router.push('/(tabs)/tracking');
     }
   };
 
-  const handleReset = () => {
-    Alert.alert(
-      "Reiniciar App",
-      "¿Estás seguro? Se borrarán tus datos y volverás al inicio.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Reiniciar",
-          style: "destructive",
-          onPress: async () => {
-            await clearUserData();
-            router.replace('/');
-          }
-        }
-      ]
-    );
-  };
 
-  // Mock stats
-  const weeklyKm = 12.5;
-  const weeklyRounds = 45;
-
-  // Today's workout logic (simplified)
-  const today = new Date().toLocaleDateString('es-CL', { weekday: 'long' });
-  const todayRoutine = currentWeeklyRoutine?.days?.[today.toLowerCase()]?.workout;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text variant="titleMedium" style={{ color: theme.colors.onSurfaceVariant }}>Bienvenido,</Text>
-            <Text variant="headlineMedium" style={{ fontWeight: 'bold', color: theme.colors.onBackground }}>Atleta FitCoach</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.avatarContainer}>
+            <Image
+              source={{ uri: 'https://via.placeholder.com/40' }}
+              style={styles.avatar}
+            />
+            <View style={styles.statusDot} />
           </View>
-          <Surface style={[styles.bellButton, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
-            <MaterialCommunityIcons name="bell-outline" size={24} color={theme.colors.onSurfaceVariant} />
-          </Surface>
+          <View>
+            <Text style={styles.greeting}>Buenos días,</Text>
+            <Text style={styles.userName}>{userData?.name || 'Usuario'}</Text>
+          </View>
         </View>
+        <View style={styles.streakBadge}>
+          <MaterialCommunityIcons name="fire" size={20} color="#ff6b35" />
+          <Text style={styles.streakText}>
+            {(userData as any)?.trainingDaysPerWeek || 3} Días
+          </Text>
+        </View>
+      </View>
 
-        {/* Workout of the Day */}
-        <Surface style={styles.workoutCard} elevation={2}>
-          <TouchableRipple
-            onPress={() => router.push('/(tabs)/tracking')}
-            style={styles.touchable}
-          >
-            <>
-              <View style={[styles.workoutHeader, { backgroundColor: theme.colors.primary }]}>
-                <View style={styles.workoutInfo}>
-                  <View>
-                    <Text style={{ color: theme.colors.onPrimary, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 4 }}>Entrenamiento de Hoy</Text>
-                    <Text variant="headlineSmall" style={{ color: theme.colors.onPrimary, fontWeight: 'bold', marginBottom: 8 }}>
-                      {todayRoutine?.title || 'Boxeo Técnico'}
-                    </Text>
-                    <View style={styles.metaRow}>
-                      <MaterialCommunityIcons name="clock-outline" size={20} color={theme.colors.onPrimary} />
-                      <Text style={{ color: theme.colors.onPrimary, fontWeight: '600', marginLeft: 4 }}>{todayRoutine?.totalDuration || 45} min</Text>
-                    </View>
+      {/* Main Content */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Activity Chart */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Tu actividad</Text>
+            <Text style={styles.seeMore}>Ver más</Text>
+          </View>
+
+          <View style={styles.chartCard}>
+            <View style={styles.chartGlow} />
+            <View style={styles.chartHeader}>
+              <View>
+                <Text style={styles.chartLabel}>Objetivo diario</Text>
+                <View style={styles.chartStats}>
+                  <Text style={styles.chartPercentage}>85%</Text>
+                  <View style={styles.chartBadge}>
+                    <Text style={styles.chartBadgeText}>+12% vs ayer</Text>
                   </View>
-                  <MaterialCommunityIcons name="lightning-bolt" size={48} color="rgba(255,255,255,0.4)" />
                 </View>
               </View>
-              <View style={[styles.workoutFooter, { backgroundColor: theme.colors.primaryContainer }]}>
-                <Text style={{ color: theme.colors.onPrimaryContainer, fontWeight: 'bold' }}>Comenzar ahora</Text>
-                <MaterialCommunityIcons name="arrow-right" size={24} color={theme.colors.onPrimaryContainer} />
+              <View style={styles.chartIcon}>
+                <MaterialCommunityIcons name="chart-bar" size={24} color={COLORS.primary.DEFAULT} />
               </View>
-            </>
-          </TouchableRipple>
-        </Surface>
+            </View>
 
-        {/* Stats Grid */}
-        <Text variant="titleLarge" style={{ fontWeight: 'bold', marginBottom: 16, color: theme.colors.onBackground }}>Progreso Semanal</Text>
-        <View style={styles.statsGrid}>
-          <Surface style={[styles.statCard, { backgroundColor: theme.colors.surface }]} elevation={1}>
-            <MaterialCommunityIcons name="shoe-print" size={24} color="#4ade80" style={{ marginBottom: 8 }} />
-            <Text variant="headlineMedium" style={{ fontWeight: 'bold', color: theme.colors.onSurface }}>{weeklyKm}</Text>
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>Km Corridos</Text>
-          </Surface>
-          <Surface style={[styles.statCard, { backgroundColor: theme.colors.surface }]} elevation={1}>
-            <MaterialCommunityIcons name="boxing-glove" size={24} color="#f87171" style={{ marginBottom: 8 }} />
-            <Text variant="headlineMedium" style={{ fontWeight: 'bold', color: theme.colors.onSurface }}>{weeklyRounds}</Text>
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>Rounds</Text>
-          </Surface>
+            {/* Placeholder for chart */}
+            <View style={styles.chartPlaceholder}>
+              <Text style={styles.chartPlaceholderText}>Gráfico de actividad</Text>
+            </View>
+
+            <View style={styles.chartDays}>
+              {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, index) => (
+                <Text key={index} style={[styles.dayLabel, index === 4 && styles.dayLabelActive]}>
+                  {day}
+                </Text>
+              ))}
+            </View>
+          </View>
         </View>
 
-        {/* Weekly Activity Chart (Mock Visual) */}
-        <Surface style={[styles.chartCard, { backgroundColor: theme.colors.surface }]} elevation={1}>
-          <Text variant="titleMedium" style={{ fontWeight: 'bold', marginBottom: 16, color: theme.colors.onSurface }}>Actividad</Text>
-          <View style={styles.chartContainer}>
-            {[40, 60, 30, 80, 50, 90, 20].map((h, i) => (
-              <View key={i} style={styles.barContainer}>
-                <View style={[styles.bar, { height: `${h}%`, backgroundColor: theme.colors.primary }]} />
-                <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4 }}>
-                  {['L', 'M', 'M', 'J', 'V', 'S', 'D'][i]}
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#ff6b3520' }]}>
+              <MaterialCommunityIcons name="fire" size={18} color="#ff6b35" />
+            </View>
+            <Text style={styles.statLabel}>Calorías</Text>
+            <Text style={styles.statValue}>450</Text>
+            <Text style={styles.statUnit}>kcal</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#3b82f620' }]}>
+              <MaterialCommunityIcons name="clock-outline" size={18} color="#3b82f6" />
+            </View>
+            <Text style={styles.statLabel}>Tiempo</Text>
+            <Text style={styles.statValue}>45</Text>
+            <Text style={styles.statUnit}>min</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#a855f720' }]}>
+              <MaterialCommunityIcons name="map-marker" size={18} color="#a855f7" />
+            </View>
+            <Text style={styles.statLabel}>Distancia</Text>
+            <Text style={styles.statValue}>5.2</Text>
+            <Text style={styles.statUnit}>km</Text>
+          </View>
+        </View>
+
+        {/* Today's Workout */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {nextWorkout ? `Tu plan para ${nextWorkout.dayName}` : 'Tu plan para hoy'}
+          </Text>
+
+          <Pressable style={styles.workoutCard} onPress={handleStartWorkout}>
+            <Image
+              source={{ uri: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800' }}
+              style={styles.workoutImage}
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(16,34,22,0.8)', COLORS.background.dark]}
+              style={styles.workoutGradient}
+            />
+
+            <View style={styles.workoutContent}>
+              <View style={styles.workoutBadges}>
+                <View style={styles.workoutTypeBadge}>
+                  <Text style={styles.workoutTypeText}>FUERZA</Text>
+                </View>
+                <View style={styles.workoutLevelBadge}>
+                  <MaterialCommunityIcons name="dumbbell" size={14} color="#fff" />
+                  <Text style={styles.workoutLevelText}>Intermedio</Text>
+                </View>
+              </View>
+
+              <View style={styles.workoutInfo}>
+                <Text style={styles.workoutTitle}>
+                  {nextWorkout?.workout?.title || 'Sin rutina disponible'}
+                </Text>
+                <Text style={styles.workoutDescription}>
+                  {nextWorkout?.workout?.description || 'Genera tu primera rutina'}
                 </Text>
               </View>
-            ))}
-          </View>
-        </Surface>
 
-        {/* Reset Button */}
-        <Button
-          mode="outlined"
-          onPress={handleReset}
-          textColor={theme.colors.error}
-          style={{ marginBottom: 16, borderColor: theme.colors.error }}
-        >
-          Reiniciar App (Data de prueba)
-        </Button>
+              <View style={styles.workoutMeta}>
+                <View style={styles.workoutMetaItem}>
+                  <MaterialCommunityIcons name="timer-outline" size={18} color={COLORS.primary.DEFAULT} />
+                  <Text style={styles.workoutMetaText}>45 min</Text>
+                </View>
+                <View style={styles.workoutMetaItem}>
+                  <MaterialCommunityIcons name="lightning-bolt" size={18} color={COLORS.primary.DEFAULT} />
+                  <Text style={styles.workoutMetaText}>320 kcal</Text>
+                </View>
+              </View>
+            </View>
+          </Pressable>
+        </View>
 
-        {/* Supabase Test Button */}
-        <Button
-          mode="contained"
-          onPress={handleTestSupabase}
-          style={{ marginBottom: 16, backgroundColor: '#3b82f6' }}
-        >
-          Probar Conexión Supabase
-        </Button>
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Acceso Rápido</Text>
 
-        <Button
-          mode="contained"
-          onPress={handleTestLogin}
-          style={{ marginBottom: 32, backgroundColor: '#10b981' }}
-        >
-          Login de Prueba (Test User)
-        </Button>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickActions}>
+            <Pressable style={styles.quickActionCard} onPress={() => router.push('/(tabs)/tracking')}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#13ec5b20' }]}>
+                <MaterialCommunityIcons name="run" size={24} color={COLORS.primary.DEFAULT} />
+              </View>
+              <Text style={styles.quickActionTitle}>Running GPS</Text>
+              <Text style={styles.quickActionSubtitle}>Libre</Text>
+            </Pressable>
 
+            <Pressable style={styles.quickActionCard}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#3b82f620' }]}>
+                <MaterialCommunityIcons name="yoga" size={24} color="#3b82f6" />
+              </View>
+              <Text style={styles.quickActionTitle}>Estiramiento</Text>
+              <Text style={styles.quickActionSubtitle}>10 min</Text>
+            </Pressable>
+
+            <Pressable style={styles.quickActionCard}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#ef444420' }]}>
+                <MaterialCommunityIcons name="timer-off-outline" size={24} color="#ef4444" />
+              </View>
+              <Text style={styles.quickActionTitle}>HIIT Express</Text>
+              <Text style={styles.quickActionSubtitle}>15 min</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Floating Action Button */}
+      <View style={styles.fabContainer}>
+        <Pressable
+          style={[styles.fab, !nextWorkout && styles.fabDisabled]}
+          onPress={handleStartWorkout}
+          disabled={!nextWorkout}
+        >
+          <MaterialCommunityIcons name="play" size={24} color={COLORS.background.dark} />
+          <Text style={styles.fabText}>Empezar Rutina</Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
@@ -187,75 +289,348 @@ export default function Dashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 100,
+    backgroundColor: COLORS.background.dark,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#23482f',
+    backgroundColor: `${COLORS.background.dark}F2`,
   },
-  bellButton: {
-    padding: 8,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatar: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    borderWidth: 2,
+    borderColor: `${COLORS.primary.DEFAULT}80`,
   },
-  workoutCard: {
-    borderRadius: 24,
+  statusDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: COLORS.primary.DEFAULT,
+    borderWidth: 2,
+    borderColor: COLORS.background.dark,
+  },
+  greeting: {
+    fontSize: 12,
+    fontFamily: 'Lexend_500Medium',
+    color: '#92c9a4',
+  },
+  userName: {
+    fontSize: 18,
+    fontFamily: 'Lexend_700Bold',
+    color: '#fff',
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#23482f80',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary.DEFAULT}33`,
+  },
+  streakText: {
+    fontSize: 14,
+    fontFamily: 'Lexend_700Bold',
+    color: COLORS.primary.DEFAULT,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  section: {
+    marginTop: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontFamily: 'Lexend_700Bold',
+    color: '#fff',
+  },
+  seeMore: {
+    fontSize: 14,
+    fontFamily: 'Lexend_600SemiBold',
+    color: COLORS.primary.DEFAULT,
+  },
+  chartCard: {
+    backgroundColor: '#182e21',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#23482f',
+    position: 'relative',
     overflow: 'hidden',
-    marginBottom: 32,
   },
-  touchable: {
-    width: '100%',
+  chartGlow: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 128,
+    height: 128,
+    backgroundColor: `${COLORS.primary.DEFAULT}0D`,
+    borderRadius: 64,
   },
-  workoutHeader: {
-    padding: 24,
-  },
-  workoutInfo: {
+  chartHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 24,
+    zIndex: 10,
   },
-  metaRow: {
+  chartLabel: {
+    fontSize: 14,
+    fontFamily: 'Lexend_500Medium',
+    color: '#92c9a4',
+    marginBottom: 4,
+  },
+  chartStats: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
+    gap: 8,
   },
-  workoutFooter: {
-    padding: 16,
+  chartPercentage: {
+    fontSize: 36,
+    fontFamily: 'Lexend_700Bold',
+    color: '#fff',
+  },
+  chartBadge: {
+    backgroundColor: `${COLORS.primary.DEFAULT}1A`,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  chartBadgeText: {
+    fontSize: 12,
+    fontFamily: 'Lexend_700Bold',
+    color: COLORS.primary.DEFAULT,
+  },
+  chartIcon: {
+    backgroundColor: '#23482f',
+    padding: 8,
+    borderRadius: 8,
+  },
+  chartPlaceholder: {
+    height: 128,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  chartPlaceholderText: {
+    fontSize: 14,
+    fontFamily: 'Lexend_400Regular',
+    color: '#92c9a4',
+  },
+  chartDays: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+  },
+  dayLabel: {
+    fontSize: 12,
+    fontFamily: 'Lexend_600SemiBold',
+    color: '#92c9a4',
+    textTransform: 'uppercase',
+  },
+  dayLabelActive: {
+    color: '#fff',
   },
   statsGrid: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
+    gap: 12,
+    marginTop: 24,
   },
   statCard: {
     flex: 1,
-    padding: 16,
+    backgroundColor: '#182e21',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#23482f',
+    gap: 8,
+  },
+  statIcon: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  chartCard: {
-    padding: 24,
-    borderRadius: 24,
-    marginBottom: 32,
+  statLabel: {
+    fontSize: 12,
+    fontFamily: 'Lexend_500Medium',
+    color: '#92c9a4',
   },
-  chartContainer: {
+  statValue: {
+    fontSize: 18,
+    fontFamily: 'Lexend_700Bold',
+    color: '#fff',
+  },
+  statUnit: {
+    fontSize: 12,
+    fontFamily: 'Lexend_400Regular',
+    color: '#92c9a4',
+  },
+  workoutCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#23482f',
+    position: 'relative',
+    height: 280,
+  },
+  workoutImage: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.4,
+  },
+  workoutGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  workoutContent: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  workoutBadges: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    height: 128,
-    alignItems: 'flex-end',
   },
-  barContainer: {
-    alignItems: 'center',
-    height: '100%',
-    justifyContent: 'flex-end',
-  },
-  bar: {
-    width: 8,
+  workoutTypeBadge: {
+    backgroundColor: COLORS.primary.DEFAULT,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 4,
+  },
+  workoutTypeText: {
+    fontSize: 12,
+    fontFamily: 'Lexend_700Bold',
+    color: COLORS.background.dark,
+    letterSpacing: 1,
+  },
+  workoutLevelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  workoutLevelText: {
+    fontSize: 12,
+    fontFamily: 'Lexend_500Medium',
+    color: '#fff',
+  },
+  workoutInfo: {
+    gap: 4,
+  },
+  workoutTitle: {
+    fontSize: 20,
+    fontFamily: 'Lexend_700Bold',
+    color: '#fff',
+  },
+  workoutDescription: {
+    fontSize: 14,
+    fontFamily: 'Lexend_400Regular',
+    color: '#92c9a4',
+    lineHeight: 20,
+  },
+  workoutMeta: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  workoutMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  workoutMetaText: {
+    fontSize: 14,
+    fontFamily: 'Lexend_500Medium',
+    color: '#fff',
+  },
+  quickActions: {
+    marginTop: 12,
+  },
+  quickActionCard: {
+    width: 144,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#182e21',
+    borderWidth: 1,
+    borderColor: '#23482f',
+    gap: 12,
+    marginRight: 16,
+  },
+  quickActionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickActionTitle: {
+    fontSize: 14,
+    fontFamily: 'Lexend_700Bold',
+    color: '#fff',
+  },
+  quickActionSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Lexend_400Regular',
+    color: '#92c9a4',
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    right: 16,
+    zIndex: 20,
+  },
+  fab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary.DEFAULT,
+    height: 56,
+    borderRadius: 12,
+    shadowColor: COLORS.primary.DEFAULT,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 8,
+    gap: 8,
+  },
+  fabText: {
+    fontSize: 16,
+    fontFamily: 'Lexend_700Bold',
+    color: COLORS.background.dark,
+  },
+  fabDisabled: {
+    backgroundColor: '#92c9a4',
+    opacity: 0.5,
   },
 });

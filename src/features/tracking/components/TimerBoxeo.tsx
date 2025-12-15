@@ -22,10 +22,10 @@ export const TimerBoxeo: React.FC<TimerBoxeoProps> = ({ sessionId = 'default', o
     const [phase, setPhase] = useState<'warmup' | 'workout' | 'cooldown' | 'finished'>('warmup');
 
     // 🔍 LOG: Ver qué workout está llegando
-    console.log('=== TIMER BOXEO DEBUG ===');
-    console.log('currentWorkout completo:', JSON.stringify(currentWorkout, null, 2));
-    console.log('currentWorkout type:', currentWorkout?.type);
-    console.log('currentWorkout title:', currentWorkout?.title);
+
+
+
+
 
     // 🔍 ALERT para ver en pantalla (temporal para debugging)
     if (currentWorkout) {
@@ -38,7 +38,7 @@ Cantidad rounds: ${(currentWorkout as any).rounds?.length || 0}
 
         // Descomentar para ver alert en pantalla:
         // Alert.alert('DEBUG Timer', debugInfo);
-        console.log('DEBUG INFO:', debugInfo);
+
     }
 
     // Extraer warmup y cooldown del workout
@@ -55,10 +55,10 @@ Cantidad rounds: ${(currentWorkout as any).rounds?.length || 0}
     })) : undefined;
 
     // 🔍 LOG: Ver rounds procesados
-    console.log('workoutRounds procesados:', JSON.stringify(workoutRounds, null, 2));
-    console.log('Cantidad de rounds:', workoutRounds?.length);
-    console.log('Warmup exercises:', warmup.length);
-    console.log('Cooldown exercises:', cooldown.length);
+
+
+
+
 
     // Calculate prep time from user settings
     const prepMinutes = userData?.prepTimeMinutes || 0;
@@ -160,7 +160,7 @@ Cantidad rounds: ${(currentWorkout as any).rounds?.length || 0}
                         pitch: 1.2,
                         rate: 1.0,
                     });
-                    console.log('Exercise countdown:', Math.floor(timeUntilNextExercise));
+
                 }
             }
 
@@ -191,7 +191,7 @@ Cantidad rounds: ${(currentWorkout as any).rounds?.length || 0}
                 rate: 0.9,
             });
 
-            console.log('Speaking instruction:', textToSpeak, 'at time:', timeLeft);
+
         }
     }, [currentExerciseIndex, isPreparing, isRest, isActive]);
 

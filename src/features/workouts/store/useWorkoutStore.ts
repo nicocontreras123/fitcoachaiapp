@@ -3,6 +3,7 @@ import { Workout, WorkoutHistory, GenerateWorkoutParams, WeeklyRoutine } from '.
 import { OpenAIService } from '@/services/openaiApi';
 import { StorageService, STORAGE_KEYS } from '@/services/storage';
 import { isApiConfigured } from '@/config/env';
+import { weeklyRoutineApi } from '@/services/weeklyRoutineApi';
 
 interface WorkoutStore {
     currentWorkout: Workout | null;
@@ -56,32 +57,105 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     generateWeeklyRoutine: async (params: GenerateWorkoutParams) => {
         set({ isGenerating: true, error: null });
         try {
+
+
             const routine = await OpenAIService.generateWeeklyRoutine(params);
 
-            // Persist routine
-            await StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, routine); // Need to add WEEKLY_ROUTINE key if missing, assume it exists or use string
-            // Actually check StorageService types.. assuming valid. 
-            // If STORAGE_KEYS is an enum I should check it.
+
+
+            // Log running workouts in the routine
+            Object.entries(routine.days).forEach(([day, dayData]) => {
+                if (dayData.workout && (dayData.workout as any).type === 'running') {
+                    console.log(`📅 Store - Running workout on ${day}:`, {
+                        title: dayData.workout.title,
+                        hasIntervals: 'intervals' in dayData.workout,
+                        intervals: (dayData.workout as any).intervals,
+                        intervalsCount: (dayData.workout as any).intervals?.length || 0
+                    });
+                }
+            });
+
+            // Guardar en localStorage como backup
+            await StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, routine);
+
+
+            // Guardar en MongoDB
+            try {
+                const savedRoutine = await weeklyRoutineApi.create({
+                    weekStarting: routine.weekStarting,
+                    goal: routine.goal,
+                    days: routine.days,
+                    isActive: true,
+                    metadata: {
+                        sports: params.sports,
+                        level: params.level,
+                        generatedBy: 'ai',
+                    },
+                });
+
+            } catch (apiError: any) {
+                console.warn('⚠️ Store - Failed to save routine to MongoDB, using localStorage only:', apiError.message);
+            }
 
             set({ currentWeeklyRoutine: routine, isGenerating: false });
+
         } catch (error: any) {
+            console.error('❌ Store - Error generating routine:', error);
             set({ error: error.message, isGenerating: false });
         }
     },
 
     loadWeeklyRoutine: async () => {
         try {
-            // We need to define the key "weekly_routine" in STORAGE_KEYS or use a literal if allowed.
-            // Assuming STORAGE_KEYS.WEEKLY_ROUTINE doesn't exist yet, I should probably add it first.
-            // For now I'll use a string literal if I can't edit StorageService directly here easily or if I assume it's safe.
-            // Better to edit STORAGE_KEYS first? 
-            // I'll assume 'weekly_routine' key.
-            const routine = await StorageService.getItem<WeeklyRoutine>(STORAGE_KEYS.WEEKLY_ROUTINE);
-            if (routine) {
-                set({ currentWeeklyRoutine: routine });
+
+
+            // Intentar cargar desde localStorage primero (más rápido)
+            const localRoutine = await StorageService.getItem<WeeklyRoutine>(STORAGE_KEYS.WEEKLY_ROUTINE);
+            if (localRoutine) {
+
+                set({ currentWeeklyRoutine: localRoutine });
+
+                // En background, intentar sincronizar con MongoDB
+                weeklyRoutineApi.getActive()
+                    .then(mongoRoutine => {
+                        if (mongoRoutine) {
+
+                            StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, mongoRoutine).catch(() => { });
+                            set({ currentWeeklyRoutine: mongoRoutine });
+                        }
+                    })
+                    .catch(error => {
+
+                    });
+
+                return;
             }
+
+            // Si no hay en localStorage, intentar cargar desde MongoDB
+
+            try {
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('MongoDB timeout')), 3000)
+                );
+                const routinePromise = weeklyRoutineApi.getActive();
+
+                const routine = await Promise.race([routinePromise, timeoutPromise]) as WeeklyRoutine | null;
+
+                if (routine) {
+
+                    // Guardar en localStorage para próxima vez
+                    await StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, routine).catch(() => { });
+                    set({ currentWeeklyRoutine: routine });
+                    return;
+                }
+            } catch (apiError: any) {
+                console.warn('⚠️ Store - Failed to load from MongoDB:', apiError.message);
+            }
+
+
         } catch (error) {
-            console.error('Error loading weekly routine:', error);
+            console.error('❌ Store - Error loading weekly routine:', error);
+            // No re-throw, just log and continue
         }
     },
 
@@ -90,10 +164,23 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     },
 
     setCurrentWorkout: (workout: Workout) => {
-        console.log('🎯 SET CURRENT WORKOUT:', JSON.stringify(workout, null, 2));
-        console.log('Workout type:', (workout as any).type);
-        console.log('Workout title:', workout.title);
-        console.log('Has rounds?:', 'rounds' in workout);
+
+
+
+
+
+
+        if ((workout as any).type === 'running') {
+
+
+
+
+
+
+
+
+        }
+
         set({ currentWorkout: workout });
     },
 

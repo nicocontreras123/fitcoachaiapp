@@ -1,65 +1,65 @@
 import { ENV, isApiConfigured } from '@/config/env';
 import {
-    GenerateWorkoutParams,
-    Workout,
-    WeeklyRoutine,
-    GymWorkout,
-    BoxingWorkout,
-    RunningWorkout,
+  GenerateWorkoutParams,
+  Workout,
+  WeeklyRoutine,
+  GymWorkout,
+  BoxingWorkout,
+  RunningWorkout,
 } from '@/features/workouts/types';
 
 interface OpenAIMessage {
-    role: 'system' | 'user' | 'assistant';
-    content: string;
+  role: 'system' | 'user' | 'assistant';
+  content: string;
 }
 
 interface OpenAIResponse {
-    choices: Array<{
-        message: {
-            content: string;
-        };
-    }>;
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
 }
 
 export class OpenAIService {
-    private static async makeRequest(messages: OpenAIMessage[]): Promise<string> {
-        if (!isApiConfigured()) {
-            // Return mock data if no key - to be implemented or throw
-            throw new Error('OpenAI API key missing');
-        }
-
-        try {
-            const response = await fetch(`${ENV.OPENAI_API_BASE_URL}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${ENV.OPENAI_API_KEY}`,
-                },
-                body: JSON.stringify({
-                    model: ENV.OPENAI_MODEL,
-                    messages,
-                    temperature: 0.7,
-                    response_format: { type: 'json_object' },
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`OpenAI API error: ${response.status}`);
-            }
-
-            const data = (await response.json()) as OpenAIResponse;
-            return data.choices[0].message.content;
-        } catch (error) {
-            console.error('OpenAI Request Error:', error);
-            throw error;
-        }
+  private static async makeRequest(messages: OpenAIMessage[]): Promise<string> {
+    if (!isApiConfigured()) {
+      // Return mock data if no key - to be implemented or throw
+      throw new Error('OpenAI API key missing');
     }
 
-    static async generateWeeklyRoutine(params: GenerateWorkoutParams): Promise<WeeklyRoutine> {
-        const { userProfile, goals, availableDays, sport } = params;
+    try {
+      const response = await fetch(`${ENV.OPENAI_API_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${ENV.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: ENV.OPENAI_MODEL,
+          messages,
+          temperature: 0.7,
+          response_format: { type: 'json_object' },
+        }),
+      });
 
-        // Construct prompt
-        const systemPrompt = `Eres un entrenador personal elite experto en ${sport === 'mixed' ? 'boxeo, running y gimnasio' : sport}.
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const data = (await response.json()) as OpenAIResponse;
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('OpenAI Request Error:', error);
+      throw error;
+    }
+  }
+
+  static async generateWeeklyRoutine(params: GenerateWorkoutParams): Promise<WeeklyRoutine> {
+    const { userProfile, goals, availableDays, sport } = params;
+
+    // Construct prompt
+    const systemPrompt = `Eres un entrenador personal elite experto en ${sport === 'mixed' ? 'boxeo, running y gimnasio' : sport}.
     Genera un plan de entrenamiento semanal completo en formato JSON estricto.
     
     Estructura JSON requerida:
@@ -156,10 +156,53 @@ export class OpenAIService {
        "totalDuration": número (min),
        "totalDistance": número (km),
        "difficulty": "beginner" | "intermediate" | "advanced",
-       "activity": "run",
-       "intervals": [],
-       "targetPace": "ej: 5:30 min/km"
+       "intervals": [
+         {
+           "type": "warm-up",
+           "duration": 5,
+           "pace": "6:00 min/km",
+           "description": "Trote suave de calentamiento"
+         },
+         {
+           "type": "run",
+           "duration": 10,
+           "pace": "5:30 min/km",
+           "description": "Ritmo constante moderado"
+         },
+         {
+           "type": "sprint",
+           "duration": 2,
+           "pace": "4:30 min/km",
+           "description": "¡A máxima velocidad!"
+         },
+         {
+           "type": "recovery",
+           "duration": 3,
+           "pace": "6:30 min/km",
+           "description": "Recuperación activa"
+         },
+         {
+           "type": "cool-down",
+           "duration": 5,
+           "pace": "6:00 min/km",
+           "description": "Enfriamiento final"
+         }
+       ],
+       "targetPace": "5:30 min/km"
     }
+
+    ⚠️ CRÍTICO PARA RUNNING - FORMATO DE INTERVALOS:
+    - NUNCA uses formato work/rest/reps
+    - SIEMPRE usa el formato exacto del ejemplo: {"type": "...", "duration": número, "pace": "...", "description": "..."}
+    - SIEMPRE incluir al menos 3-5 intervalos secuenciales
+    - OBLIGATORIO comenzar con type "warm-up" y terminar con type "cool-down"
+    - Tipos válidos: "warm-up", "run", "sprint", "recovery", "cool-down"
+    - duration está en MINUTOS (números enteros, ej: 5, 10, 2)
+    - pace en formato "M:SS min/km" (ej: "5:30 min/km", "4:45 min/km")
+    - description es texto descriptivo motivador
+    - La suma de duraciones debe aproximarse al totalDuration
+    - Ejemplo correcto: [{"type": "warm-up", "duration": 5, "pace": "6:00 min/km", "description": "Calentamiento suave"}]
+    - Ejemplo INCORRECTO (NO uses): [{"work": 60, "rest": 120, "reps": 5}]
     
     3. Gym/Funcional:
     {
@@ -184,60 +227,80 @@ export class OpenAIService {
     
     IMPORTANTE: "workout" NO puede ser null si "restDay" es false. Asegura que todos los campos requeridos (title, description, totalDuration, difficulty, warmup, cooldown) estén presentes.`;
 
-        // Mapear equipamiento a nombres legibles
-        const equipmentMap: { [key: string]: string } = {
-            'jump-rope': 'Cuerda para saltar',
-            'punching-bag': 'Saco de boxeo',
-            'treadmill': 'Trotadora/Caminadora',
-            'dumbbells': 'Pesas/Mancuernas',
-            'resistance-bands': 'Bandas elásticas',
-            'pull-up-bar': 'Barra de dominadas',
-            'kettlebells': 'Pesas rusas',
-            'yoga-mat': 'Colchoneta/Mat',
-            'none': 'Sin equipamiento'
-        };
+    // Mapear equipamiento a nombres legibles
+    const equipmentMap: { [key: string]: string } = {
+      'jump-rope': 'Cuerda para saltar',
+      'punching-bag': 'Saco de boxeo',
+      'treadmill': 'Trotadora/Caminadora',
+      'dumbbells': 'Pesas/Mancuernas',
+      'resistance-bands': 'Bandas elásticas',
+      'pull-up-bar': 'Barra de dominadas',
+      'kettlebells': 'Pesas rusas',
+      'yoga-mat': 'Colchoneta/Mat',
+      'none': 'Sin equipamiento'
+    };
 
-        const equipmentList = userProfile?.equipment?.map(eq => equipmentMap[eq] || eq).join(', ') || 'Sin equipamiento específico';
+    const equipmentList = userProfile?.equipment?.map(eq => equipmentMap[eq] || eq).join(', ') || 'Sin equipamiento específico';
 
-        const userPrompt = `Usuario: ${userProfile?.age} años, ${userProfile?.weight}kg.\n    Deportes: ${userProfile?.deportes?.join(', ') || sport}.\n    Objetivos: ${goals}.\n    Días de entrenamiento esta semana: ${availableDays?.join(', ') || 'Todos'}.\n    Días por semana objetivo: ${userProfile?.trainingDaysPerWeek || availableDays?.length || 3}.\n    Equipamiento disponible: ${equipmentList}.\n    \n    ⚠️ OBLIGATORIO - EQUIPAMIENTO:\n    - USA SOLO el equipamiento disponible: ${equipmentList}\n    - Si tiene trotadora, úsala para cardio y warmup\n    - Si tiene saco de boxeo, úsalo en entrenamientos de boxeo\n    - Si tiene pesas, inclúyelas en ejercicios de fuerza\n    - Si NO tiene equipamiento, usa solo ejercicios de peso corporal\n    - NUNCA sugieras equipamiento que el usuario NO tiene\n    \n    IMPORTANTE: \n    - Solo genera entrenamientos para estos días: ${availableDays?.join(', ')}\n    - Los demás días márcalos como \"restDay\": true\n    - Distribuye ${userProfile?.trainingDaysPerWeek || availableDays?.length} entrenamientos en los días disponibles\n    - Si hay múltiples deportes, alterna entre ellos\n    \n    Genera una rutina equilibrada y variada.`;
+    const userPrompt = `Usuario: ${userProfile?.age} años, ${userProfile?.weight}kg.\n    Deportes: ${userProfile?.deportes?.join(', ') || sport}.\n    Objetivos: ${goals}.\n    Días de entrenamiento esta semana: ${availableDays?.join(', ') || 'Todos'}.\n    Días por semana objetivo: ${userProfile?.trainingDaysPerWeek || availableDays?.length || 3}.\n    Equipamiento disponible: ${equipmentList}.\n    \n    ⚠️ OBLIGATORIO - EQUIPAMIENTO:\n    - USA SOLO el equipamiento disponible: ${equipmentList}\n    - Si tiene trotadora, úsala para cardio y warmup\n    - Si tiene saco de boxeo, úsalo en entrenamientos de boxeo\n    - Si tiene pesas, inclúyelas en ejercicios de fuerza\n    - Si NO tiene equipamiento, usa solo ejercicios de peso corporal\n    - NUNCA sugieras equipamiento que el usuario NO tiene\n    \n    IMPORTANTE: \n    - Solo genera entrenamientos para estos días: ${availableDays?.join(', ')}\n    - Los demás días márcalos como \"restDay\": true\n    - Distribuye ${userProfile?.trainingDaysPerWeek || availableDays?.length} entrenamientos en los días disponibles\n    - Si hay múltiples deportes, alterna entre ellos\n    \n    Genera una rutina equilibrada y variada.`;
 
-        try {
-            if (!isApiConfigured()) {
-                return this.getMockWeeklyRoutine();
-            }
+    try {
+      if (!isApiConfigured()) {
 
-            const content = await this.makeRequest([
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-            ]);
+        return this.getMockWeeklyRoutine();
+      }
 
-            return JSON.parse(content) as WeeklyRoutine;
-        } catch (e) {
-            console.error("Error generating weekly routine", e);
-            return this.getMockWeeklyRoutine();
+
+
+      const content = await this.makeRequest([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ]);
+
+
+
+      const routine = JSON.parse(content) as WeeklyRoutine;
+
+
+
+      // Log running workouts specifically
+      Object.entries(routine.days).forEach(([day, dayData]) => {
+        if (dayData.workout && (dayData.workout as any).type === 'running') {
+          console.log(`🏃 Running workout found on ${day}:`, {
+            title: dayData.workout.title,
+            intervals: (dayData.workout as any).intervals,
+            intervalsCount: (dayData.workout as any).intervals?.length || 0
+          });
         }
-    }
+      });
 
-    static getMockWeeklyRoutine(): WeeklyRoutine {
-        return {
-            weekStarting: new Date().toISOString(),
-            goal: "Mantener estado físico (Mock)",
-            days: {
-                lunes: {
-                    day: "Lunes",
-                    restDay: false,
-                    workout: {
-                        title: "Boxeo Técnico",
-                        difficulty: "intermediate",
-                        totalDuration: 45,
-                        description: "Enfoque en técnica y footwork",
-                        warmup: [],
-                        rounds: [],
-                        cooldown: []
-                    } as BoxingWorkout
-                },
-                // ... other days
-            }
-        };
+      return routine;
+    } catch (e) {
+      console.error("❌ Error generating weekly routine", e);
+      return this.getMockWeeklyRoutine();
     }
+  }
+
+  static getMockWeeklyRoutine(): WeeklyRoutine {
+    return {
+      weekStarting: new Date().toISOString(),
+      goal: "Mantener estado físico (Mock)",
+      days: {
+        lunes: {
+          day: "Lunes",
+          restDay: false,
+          workout: {
+            title: "Boxeo Técnico",
+            difficulty: "intermediate",
+            totalDuration: 45,
+            description: "Enfoque en técnica y footwork",
+            warmup: [],
+            rounds: [],
+            cooldown: []
+          } as BoxingWorkout
+        },
+        // ... other days
+      }
+    };
+  }
 }

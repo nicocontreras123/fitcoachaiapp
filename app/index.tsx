@@ -11,13 +11,27 @@ export default function Index() {
 
   useEffect(() => {
     if (!isLoading && !authLoading) {
+
+
+
+
       if (!user) {
+
         router.replace('/onboarding/welcome');
       } else if (hasCompletedOnboarding) {
-        router.replace('/(tabs)');
+
+        try {
+          router.replace('/(tabs)');
+
+        } catch (error) {
+          console.error('❌ Navigation error:', error);
+        }
       } else {
+
         router.replace('/onboarding/personal-info');
       }
+    } else {
+
     }
   }, [hasCompletedOnboarding, isLoading, user, authLoading, router]);
 

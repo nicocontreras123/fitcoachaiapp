@@ -70,7 +70,7 @@ const playBellSound = async () => {
             await bellSoundRef.current.setPositionAsync(0);
             // Play the bell
             await bellSoundRef.current.playAsync();
-            console.log('Bell sound played');
+            
         } catch (error) {
             console.error('Error playing bell sound:', error);
         }

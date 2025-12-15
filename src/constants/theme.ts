@@ -1,17 +1,31 @@
-// Palette: Pulse Fit (Professional AI Fitness)
+// Palette: FitCoach AI (Neon Green Energy)
 export const COLORS = {
-  // Brand Core
+  // Brand Core - Neon Green Theme
   primary: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6', // Bright Blue - Actionable
-    600: '#2563eb',
-    700: '#1d4ed8', // Primary Brand Color (Deep Energy)
-    800: '#1e40af',
-    900: '#1e3a8a',
+    DEFAULT: '#13ec5b', // Neon Green - Main brand color
+    50: '#f0fdf4',
+    100: '#dcfce7',
+    200: '#bbf7d0',
+    300: '#86efac',
+    400: '#4ade80',
+    500: '#13ec5b', // Neon Green
+    600: '#10c94d',
+    700: '#0da640',
+    800: '#0a8333',
+    900: '#076026',
+  },
+
+  // Background colors
+  background: {
+    light: '#f6f8f6',
+    dark: '#102216',
+    darker: '#0a1510',
+  },
+
+  // Surface colors for inputs and cards
+  surface: {
+    dark: '#192e21',
+    input: '#0c1b11',
   },
   secondary: {
     50: '#f0fdf4',

@@ -43,7 +43,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
             timerSoundEnabled: backendUser.timerSoundEnabled ?? true,
             prepTimeMinutes: backendUser.prepTimeMinutes ?? 0,
             prepTimeSeconds: backendUser.prepTimeSeconds ?? 10,
-            hasCompletedOnboarding: true,
+            hasCompletedOnboarding: backendUser.hasCompletedOnboarding ?? false,
           };
 
           // Cache locally
@@ -51,13 +51,13 @@ export const useUserStore = create<UserStore>((set, get) => ({
 
           set({
             userData,
-            hasCompletedOnboarding: true,
+            hasCompletedOnboarding: backendUser.hasCompletedOnboarding ?? false,
             isLoading: false,
           });
           return;
         }
       } catch (apiError) {
-        console.log('API not available, loading from local storage');
+
       }
 
       // Fallback to local storage
@@ -89,7 +89,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
       try {
         await api.updateUser(updatedData);
       } catch (apiError) {
-        console.log('Could not update in backend, saving locally only');
+
       }
 
       // Always update locally
@@ -118,8 +118,10 @@ export const useUserStore = create<UserStore>((set, get) => ({
       // Try to save in backend
       try {
         await api.updateUser(completeData);
-      } catch (apiError) {
-        console.log('Could not save in backend, saving locally only');
+
+      } catch (apiError: any) {
+        console.error('❌ Error guardando en backend:', apiError.message || apiError);
+
       }
 
       // Always save locally

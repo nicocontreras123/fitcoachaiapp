@@ -3,13 +3,13 @@ import Constants from 'expo-constants';
 
 const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
 
-console.log('🌐 API URL configurada:', API_URL);
 
-async function getAuthHeaders() {
+
+export async function getAuthHeaders() {
   const token = await authApi.getToken();
 
-  console.log('🔑 Token status:', token ? 'Existe' : 'No existe');
-  console.log('🔑 Access token:', token ? `${token.substring(0, 20)}...` : 'No hay token');
+
+
 
   if (!token) {
     return null;
@@ -27,10 +27,11 @@ export const api = {
       const headers = await getAuthHeaders();
 
       if (!headers) {
+
         throw new Error('NOT_AUTHENTICATED');
       }
 
-      console.log('📡 Fetching user from:', `${API_URL}/users/me`);
+
 
       // Create timeout promise
       const timeoutPromise = new Promise((_, reject) => {
@@ -39,7 +40,10 @@ export const api = {
 
       const fetchPromise = fetch(`${API_URL}/users/me`, { headers });
 
+
       const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
+
 
       if (response.status === 401) {
         console.error('❌ Unauthorized - backend rejected token');
@@ -49,10 +53,13 @@ export const api = {
         console.error('❌ Failed to fetch user:', response.status, response.statusText);
         throw new Error('Failed to fetch user');
       }
-      return response.json();
+
+      const data = await response.json();
+
+      return data;
     } catch (error: any) {
       if (error.message === 'TIMEOUT') {
-        console.log('⏱️ Request timeout - backend not responding');
+
       }
       console.error('❌ Error fetching user:', error);
       throw error;
@@ -63,12 +70,19 @@ export const api = {
     const headers = await getAuthHeaders();
     if (!headers) throw new Error('NOT_AUTHENTICATED');
 
+
     const response = await fetch(`${API_URL}/users/me`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update user');
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Update failed:', response.status, errorText);
+      throw new Error(`Failed to update user: ${response.status} - ${errorText}`);
+    }
+
     return response.json();
   },
 
@@ -135,6 +149,15 @@ export const api = {
 
     const response = await fetch(`${API_URL}/workouts/completed`, { headers });
     if (!response.ok) throw new Error('Failed to fetch completed workouts');
+    return response.json();
+  },
+
+  async getWeeklyStats() {
+    const headers = await getAuthHeaders();
+    if (!headers) throw new Error('NOT_AUTHENTICATED');
+
+    const response = await fetch(`${API_URL}/workouts/stats/weekly`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch weekly stats');
     return response.json();
   },
 };

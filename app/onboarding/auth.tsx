@@ -1,19 +1,19 @@
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, ImageBackground, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Text, Button, TextInput, useTheme } from 'react-native-paper';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { Text } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Logo } from '@/components/common/Logo';
 import { api } from '@/services/api';
+import { COLORS } from '@/constants/theme';
+import { PrimaryButton, SecondaryButton, PrimaryInput } from '@/components/common';
 
 export default function AuthScreen() {
   const router = useRouter();
-  const theme = useTheme();
   const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
 
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(false); // Default to Sign Up
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,33 +28,28 @@ export default function AuthScreen() {
     try {
       if (isLogin) {
         await signInWithEmail(email, password);
-        console.log('✅ Login exitoso');
+
 
         try {
-          // Consultar estado del usuario
           const user: any = await api.getCurrentUser();
-          console.log('User data:', user);
 
-          // Verificar si faltan datos
-          // (Ajusta estas condiciones según lo que tu backend considere perfil incompleto)
-          if (!user || !user.height || !user.weight || !user.fitness_level || !user.goal) {
-            // Usuario incompleto -> Completar perfil (ir a información personal)
-            router.replace('/onboarding/personal-info');
-          } else {
-            // Usuario con datos completos -> Ir a la app
+
+          // Verificar si completó el onboarding
+          if (user && user.hasCompletedOnboarding) {
+
             router.replace('/(tabs)');
+          } else {
+
+            router.replace('/onboarding/personal-info');
           }
         } catch (fetchError) {
           console.error('Error obteniendo datos del usuario:', fetchError);
-          // Si falla al obtener usuario, ir al inicio del onboarding de datos
           router.replace('/onboarding/personal-info');
         }
 
       } else {
         await signUpWithEmail(email, password);
-        console.log('✅ Registro exitoso - navegando al onboarding');
 
-        // Navegar directamente al onboarding después del registro
         router.replace('/onboarding/personal-info');
       }
     } catch (error: any) {
@@ -68,16 +63,18 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       await signInWithGoogle();
-      console.log('✅ Google Sign In exitoso');
 
-      // Verificar si el usuario necesita completar el onboarding
+
       try {
         const user: any = await api.getCurrentUser();
 
-        if (!user || !user.height || !user.weight || !user.fitness_level || !user.goal) {
-          router.replace('/onboarding/personal-info');
-        } else {
+        // Verificar si completó el onboarding
+        if (user && user.hasCompletedOnboarding) {
+
           router.replace('/(tabs)');
+        } else {
+
+          router.replace('/onboarding/personal-info');
         }
       } catch (fetchError) {
         console.error('Error obteniendo datos del usuario:', fetchError);
@@ -91,133 +88,228 @@ export default function AuthScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.content}>
-        <Animated.View entering={FadeInDown.delay(100).duration(800)} style={{ alignItems: 'center' }}>
-          <Logo size="large" style={{ marginBottom: 24 }} />
-          <Text
-            variant="displaySmall"
-            style={{
-              color: theme.colors.primary,
-              marginBottom: 8,
-              letterSpacing: -1,
-            }}
-          >
-            {isLogin ? 'Bienvenido' : 'Crear Cuenta'}
-          </Text>
-          <Text
-            variant="titleMedium"
-            style={{
-              color: theme.colors.secondary,
-              marginBottom: 40,
-              textAlign: 'center',
-            }}
-          >
-            {isLogin
-              ? 'Inicia sesión para continuar'
-              : 'Regístrate para comenzar tu entrenamiento'}
-          </Text>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(300).duration(800)} style={{ gap: 16 }}>
-          <TextInput
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            mode="outlined"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            disabled={loading}
+    <View style={styles.container}>
+      {/* Header Image with Logo */}
+      <View style={styles.headerContainer}>
+        <ImageBackground
+          source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFCDV-MrRNS5dnpLryfEshOFK60tbp7JFa5iznv_IfL80iEdmbj6oUAhV96AsMcMWA8SLc_BBcpIyWRv_G7nv6G8mtpwsF6LlVhNJGxAYJkCs0Qr4FrNlpCdHp0dqiITJnigy9LTmB2OvbLjTaPPtO1-T2kCzMLuSDxpiXq5PjHAOff2N3qciTnwE9BGdYJxCuH56u7iUsXBVH5E2bkQu2Eqy79RppvkyJInH9xBHsInvo9rAqAApepTnEJeKXswC8QcgXChBAlSo' }}
+          style={styles.headerImage}
+          resizeMode="cover"
+        >
+          <LinearGradient
+            colors={['transparent', COLORS.background.dark]}
+            style={styles.headerGradient}
           />
-          <TextInput
-            label="Contraseña"
-            value={password}
-            onChangeText={setPassword}
-            mode="outlined"
-            secureTextEntry
-            autoCapitalize="none"
-            disabled={loading}
-          />
+        </ImageBackground>
 
-          <Button
-            mode="contained"
-            onPress={handleEmailAuth}
-            loading={loading}
-            disabled={loading}
-            contentStyle={{ height: 56 }}
-            labelStyle={{ fontSize: 16, fontWeight: '600' }}
-            style={{ borderRadius: 28, marginTop: 8 }}
-          >
-            {isLogin ? 'Iniciar Sesión' : 'Registrarse'}
-          </Button>
-
-          <View style={styles.divider}>
-            <View style={[styles.dividerLine, { backgroundColor: theme.colors.outlineVariant }]} />
-            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, paddingHorizontal: 16 }}>
-              o continúa con
-            </Text>
-            <View style={[styles.dividerLine, { backgroundColor: theme.colors.outlineVariant }]} />
-          </View>
-
-          <Button
-            mode="outlined"
-            onPress={handleGoogleAuth}
-            loading={loading}
-            disabled={loading}
-            contentStyle={{ height: 56 }}
-            labelStyle={{ fontSize: 16, fontWeight: '600' }}
-            style={{ borderRadius: 28 }}
-            icon="google"
-          >
-            Google
-          </Button>
-
-          <Button
-            mode="text"
-            onPress={() => setIsLogin(!isLogin)}
-            disabled={loading}
-            style={{ marginTop: 16 }}
-          >
-            {isLogin
-              ? '¿No tienes cuenta? Regístrate'
-              : '¿Ya tienes cuenta? Inicia sesión'}
-          </Button>
-        </Animated.View>
+        {/* Logo Badge */}
+        <View style={styles.logoBadge}>
+          <MaterialCommunityIcons name="lightning-bolt" size={28} color={COLORS.primary.DEFAULT} />
+        </View>
       </View>
 
-      <Animated.View entering={FadeInUp.delay(600).springify()} style={styles.footer}>
-        <Button
-          mode="text"
-          onPress={() => router.back()}
-          disabled={loading}
+      {/* KeyboardAvoidingView wrapping ScrollView */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
         >
-          Volver
-        </Button>
-      </Animated.View>
-    </SafeAreaView>
+          {/* Headline */}
+          <View style={styles.headlineContainer}>
+            <Text style={styles.headline}>Potencia tu Entrenamiento</Text>
+            <Text style={styles.subtitle}>
+              Registra entrenamientos, corre con GPS y alcanza tus metas.
+            </Text>
+          </View>
+
+          {/* Segmented Control */}
+          <View style={styles.segmentedControl}>
+            <Pressable
+              style={[styles.segment, !isLogin && styles.segmentActive]}
+              onPress={() => setIsLogin(false)}
+            >
+              <Text style={[styles.segmentText, !isLogin && styles.segmentTextActive]}>
+                Registrarse
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.segment, isLogin && styles.segmentActive]}
+              onPress={() => setIsLogin(true)}
+            >
+              <Text style={[styles.segmentText, isLogin && styles.segmentTextActive]}>
+                Iniciar Sesión
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Form */}
+          <View style={styles.form}>
+            {/* Email */}
+            <PrimaryInput
+              icon="email"
+              placeholder="Correo electrónico"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            {/* Password */}
+            <PrimaryInput
+              icon="lock"
+              placeholder="Contraseña"
+              value={password}
+              onChangeText={setPassword}
+              isPassword
+              autoCapitalize="none"
+            />
+
+            {/* Main Action Button */}
+            <PrimaryButton
+              onPress={handleEmailAuth}
+              icon="arrow-right"
+              disabled={loading}
+            >
+              {isLogin ? 'INICIAR SESIÓN' : 'CREAR CUENTA'}
+            </PrimaryButton>
+          </View>
+
+          {/* Divider */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>O CONTINÚA CON</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Google Button */}
+          <SecondaryButton
+            onPress={handleGoogleAuth}
+            googleIcon
+            disabled={loading}
+          >
+            Google
+          </SecondaryButton>
+
+          {/* Bottom spacer */}
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.background.dark,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  headerContainer: {
+    height: 280,
+    position: 'relative',
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  logoBadge: {
+    position: 'absolute',
+    top: 48,
+    alignSelf: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: `${COLORS.primary.DEFAULT}33`,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary.DEFAULT}4D`,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
+    marginTop: -40,
   },
-  divider: {
+  contentContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+  headlineContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  headline: {
+    fontSize: 32,
+    fontFamily: 'Lexend_700Bold',
+    color: '#ffffff',
+    textAlign: 'center',
+    lineHeight: 40,
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    fontFamily: 'Lexend_400Regular',
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface.dark,
+    borderRadius: 12,
+    padding: 4,
+    height: 48,
+    marginBottom: 24,
+  },
+  segment: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  segmentActive: {
+    backgroundColor: COLORS.primary.DEFAULT,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontFamily: 'Lexend_500Medium',
+    color: '#9ca3af',
+  },
+  segmentTextActive: {
+    color: '#000000',
+  },
+  form: {
+    gap: 16,
+    marginBottom: 24,
+  },
+  dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 8,
+    marginVertical: 24,
   },
   dividerLine: {
     flex: 1,
     height: 1,
+    backgroundColor: COLORS.surface.dark,
   },
-  footer: {
-    paddingHorizontal: 32,
-    paddingBottom: 40,
+  dividerText: {
+    fontSize: 12,
+    fontFamily: 'Lexend_500Medium',
+    color: '#6b7280',
+    marginHorizontal: 12,
+  },
+  bottomSpacer: {
+    height: 24,
   },
 });

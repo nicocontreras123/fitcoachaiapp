@@ -71,6 +71,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { api } = await import('@/services/api');
         const userData = await api.getCurrentUser();
         setUser(userData);
+
+        // Sincronizar userStore después de cargar el usuario
+        const { useUserStore } = await import('@/features/profile/store/userStore');
+        await useUserStore.getState().loadUserData();
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
@@ -85,6 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await authApi.googleAuth(idToken);
       setUser(data.user);
+
+      // Sincronizar userStore después del login con Google
+      const { useUserStore } = await import('@/features/profile/store/userStore');
+      await useUserStore.getState().loadUserData();
     } catch (error: any) {
       console.error('Error signing in with Google:', error.message);
       throw error;
@@ -104,6 +112,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await authApi.login(email, password);
       setUser(data.user);
+
+      // Sincronizar userStore después del login
+      const { useUserStore } = await import('@/features/profile/store/userStore');
+      await useUserStore.getState().loadUserData();
     } catch (error: any) {
       console.error('Error signing in:', error.message);
       throw error;
@@ -114,6 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await authApi.signup(email, password);
       setUser(data.user);
+
+      // Sincronizar userStore después del signup
+      const { useUserStore } = await import('@/features/profile/store/userStore');
+      await useUserStore.getState().loadUserData();
     } catch (error: any) {
       console.error('Error signing up:', error.message);
       throw error;
@@ -124,6 +140,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await authApi.logout();
       setUser(null);
+
+      // Limpiar userStore al hacer logout
+      const { useUserStore } = await import('@/features/profile/store/userStore');
+      await useUserStore.getState().clearUserData();
     } catch (error: any) {
       console.error('Error signing out:', error.message);
       throw error;

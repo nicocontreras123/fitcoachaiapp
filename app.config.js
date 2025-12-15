@@ -49,7 +49,9 @@ export default ({ config }) => ({
             }
         ],
         "expo-font",
-        "expo-web-browser"
+        "expo-web-browser",
+        "expo-audio",
+        "expo-asset"
     ],
     scheme: "fitcoach",
     experiments: {

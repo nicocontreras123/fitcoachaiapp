@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import { translateLevel } from '@/utils/translations';
 import React from 'react';
 
 export default function ProfileScreen() {
@@ -230,8 +231,8 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.infoItem}>
                 <Text variant="bodySmall" style={{ color: colors.textSecondary }}>Nivel</Text>
-                <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: 'bold', textTransform: 'capitalize' }}>
-                  {userData.level}
+                <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: 'bold' }}>
+                  {translateLevel(userData.level)}
                 </Text>
               </View>
             </View>

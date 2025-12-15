@@ -4,6 +4,7 @@ import { Surface, Text, TouchableRipple, useTheme } from 'react-native-paper';
 import { DailyRoutine } from '../types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { translateLevel } from '@/utils/translations';
 
 interface TodayWorkoutCardProps {
     dayInfo: DailyRoutine;
@@ -157,14 +158,14 @@ export const TodayWorkoutCard: React.FC<TodayWorkoutCardProps> = ({ dayInfo, onP
                                 <Text variant="headlineSmall" style={[styles.metaValue, { color: theme.colors.onSurface }]}>
                                     {workout?.totalDuration}
                                 </Text>
-                                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>minutoss</Text>
+                                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>minutos</Text>
                             </View>
 
                             {workout && 'difficulty' in workout && workout.difficulty && (
                                 <View style={[styles.metaCard, { backgroundColor: theme.colors.surfaceVariant }]}>
                                     <MaterialCommunityIcons name="chart-line" size={24} color={gradientColors[0]} />
-                                    <Text variant="headlineSmall" style={[styles.metaValue, { color: theme.colors.onSurface, textTransform: 'capitalize' }]}>
-                                        {workout.difficulty}
+                                    <Text variant="titleLarge" style={[styles.metaValue, { color: theme.colors.onSurface, textTransform: 'capitalize' }]}>
+                                        {translateLevel(workout.difficulty)}
                                     </Text>
                                     <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>dificultad</Text>
                                 </View>
@@ -173,7 +174,7 @@ export const TodayWorkoutCard: React.FC<TodayWorkoutCardProps> = ({ dayInfo, onP
                             {workout && 'rounds' in workout && workout.rounds && Array.isArray(workout.rounds) && (
                                 <View style={[styles.metaCard, { backgroundColor: theme.colors.surfaceVariant }]}>
                                     <MaterialCommunityIcons name="repeat" size={24} color={gradientColors[0]} />
-                                    <Text variant="headlineSmall" style={[styles.metaValue, { color: theme.colors.onSurface }]}>
+                                    <Text variant="titleLarge" style={[styles.metaValue, { color: theme.colors.onSurface }]}>
                                         {workout.rounds.length}
                                     </Text>
                                     <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>rounds</Text>

@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, ImageBackground } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, TextInput, ProgressBar, Text, HelperText, useTheme } from 'react-native-paper';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Text } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useOnboardingStore } from '@/features/onboarding/store/onboardingStore';
 import { personalInfoSchema } from '@/features/onboarding/schemas';
+import { COLORS } from '@/constants/theme';
+import { PrimaryButton, LabeledInput, ProgressIndicator } from '@/components/common';
 
 export default function PersonalInfoScreen() {
   const router = useRouter();
-  const theme = useTheme();
   const { formData, setFormData } = useOnboardingStore();
 
   const [name, setName] = useState(formData.name || '');
@@ -33,7 +35,6 @@ export default function PersonalInfoScreen() {
     } catch (error) {
       if (error instanceof Error && 'errors' in error) {
         const zodErrors: Record<string, string> = {};
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (error as any).errors.forEach((err: any) => {
           zodErrors[err.path[0]] = err.message;
         });
@@ -43,89 +44,172 @@ export default function PersonalInfoScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1, backgroundColor: theme.colors.background }}
-    >
-      <View style={{ paddingTop: 60, paddingHorizontal: 20, paddingBottom: 10 }}>
-        <ProgressBar progress={0.2} color={theme.colors.primary} style={{ height: 6, borderRadius: 3 }} />
-        <Text style={{ marginTop: 10, textAlign: 'right', color: theme.colors.onSurfaceVariant }}>1 de 4</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={{ padding: 24 }}>
-        <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text variant="headlineMedium" style={{ fontWeight: 'bold', marginBottom: 8, color: theme.colors.onBackground }}>
-            Información Personal
-          </Text>
-          <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 32 }}>
-            Cuéntanos un poco sobre ti para personalizar tu experiencia
-          </Text>
-
-          <View style={{ marginBottom: 16 }}>
-            <TextInput
-              mode="outlined"
-              label="Nombre"
-              placeholder="Tu nombre"
-              value={name}
-              onChangeText={setName}
-              error={!!errors.name}
-              style={{ backgroundColor: theme.colors.surface }}
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={0}
+      >
+        {/* Header Image */}
+        <View style={styles.headerContainer}>
+          <ImageBackground
+            source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFCDV-MrRNS5dnpLryfEshOFK60tbp7JFa5iznv_IfL80iEdmbj6oUAhV96AsMcMWA8SLc_BBcpIyWRv_G7nv6G8mtpwsF6LlVhNJGxAYJkCs0Qr4FrNlpCdHp0dqiITJnigy9LTmB2OvbLjTaPPtO1-T2kCzMLuSDxpiXq5PjHAOff2N3qciTnwE9BGdYJxCuH56u7iUsXBVH5E2bkQu2Eqy79RppvkyJInH9xBHsInvo9rAqAApepTnEJeKXswC8QcgXChBAlSo' }}
+            style={styles.headerImage}
+            resizeMode="cover"
+          >
+            <LinearGradient
+              colors={['transparent', COLORS.background.dark]}
+              style={styles.headerGradient}
             />
-            {errors.name && <HelperText type="error" visible={!!errors.name}>{errors.name}</HelperText>}
+          </ImageBackground>
+
+          {/* Progress Indicator with Dots - Absolute Position */}
+          <View style={styles.progressContainer}>
+            <ProgressIndicator
+              current={1}
+              total={6}
+              onBack={() => router.back()}
+            />
+          </View>
+        </View>
+
+        {/* Content */}
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+        >
+          {/* Headline */}
+          <View style={styles.headlineContainer}>
+            <Text style={styles.headline}>Información Personal</Text>
+            <Text style={styles.subtitle}>
+              Cuéntanos un poco sobre ti para personalizar tu experiencia
+            </Text>
           </View>
 
-          <View style={{ marginBottom: 16 }}>
-            <TextInput
-              mode="outlined"
+          {/* Form */}
+          <View style={styles.form}>
+            {/* Name */}
+            <LabeledInput
+              label="Nombre"
+              icon="account"
+              placeholder="e.g. Alex Smith"
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+              error={errors.name}
+            />
+
+            {/* Age */}
+            <LabeledInput
               label="Edad"
-              placeholder="Tu edad"
+              icon="cake"
+              placeholder="e.g. 25"
               value={age}
               onChangeText={setAge}
               keyboardType="numeric"
-              error={!!errors.age}
-              style={{ backgroundColor: theme.colors.surface }}
+              error={errors.age}
             />
-            {errors.age && <HelperText type="error" visible={!!errors.age}>{errors.age}</HelperText>}
-          </View>
 
-          <View style={{ marginBottom: 16 }}>
-            <TextInput
-              mode="outlined"
+            {/* Weight */}
+            <LabeledInput
               label="Peso (kg)"
-              placeholder="Tu peso en kilogramos"
+              icon="weight"
+              placeholder="e.g. 70"
               value={weight}
               onChangeText={setWeight}
               keyboardType="decimal-pad"
-              error={!!errors.weight}
-              style={{ backgroundColor: theme.colors.surface }}
+              error={errors.weight}
             />
-            {errors.weight && <HelperText type="error" visible={!!errors.weight}>{errors.weight}</HelperText>}
-          </View>
 
-          <View style={{ marginBottom: 32 }}>
-            <TextInput
-              mode="outlined"
+            {/* Height */}
+            <LabeledInput
               label="Altura (cm)"
-              placeholder="Tu altura en centímetros"
+              icon="human-male-height"
+              placeholder="e.g. 175"
               value={height}
               onChangeText={setHeight}
               keyboardType="numeric"
-              error={!!errors.height}
-              style={{ backgroundColor: theme.colors.surface }}
+              error={errors.height}
             />
-            {errors.height && <HelperText type="error" visible={!!errors.height}>{errors.height}</HelperText>}
+
+            {/* Continue Button */}
+            <PrimaryButton
+              onPress={handleContinue}
+              icon="arrow-right"
+            >
+              CONTINUAR
+            </PrimaryButton>
           </View>
 
-          <Button
-            mode="contained"
-            onPress={handleContinue}
-            contentStyle={{ height: 50 }}
-            labelStyle={{ fontSize: 16 }}
-          >
-            Continuar
-          </Button>
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {/* Extra space at bottom for keyboard */}
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background.dark,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  headerContainer: {
+    height: 280,
+    position: 'relative',
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  progressContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  content: {
+    flex: 1,
+    marginTop: -40,
+  },
+  contentContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+  headlineContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  headline: {
+    fontSize: 32,
+    fontFamily: 'Lexend_700Bold',
+    color: '#ffffff',
+    textAlign: 'center',
+    lineHeight: 40,
+    letterSpacing: -0.5,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    fontFamily: 'Lexend_400Regular',
+    color: '#9ca3af',
+    textAlign: 'center',
+    maxWidth: 320,
+  },
+  form: {
+    gap: 16,
+  },
+  bottomSpacer: {
+    height: 24,
+  },
+});

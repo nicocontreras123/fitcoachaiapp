@@ -1,37 +1,39 @@
 import { useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Text, ProgressBar, useTheme, Chip, Surface, TouchableRipple } from 'react-native-paper';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 import { useOnboardingStore } from '@/features/onboarding/store/onboardingStore';
+import { COLORS } from '@/constants/theme';
+import { PrimaryButton, ProgressIndicator, DayButton } from '@/components/common';
 
-const DAYS_OF_WEEK = [
-    { id: 'lunes', label: 'Lunes', short: 'L' },
-    { id: 'martes', label: 'Martes', short: 'M' },
-    { id: 'miércoles', label: 'Miércoles', short: 'X' },
-    { id: 'jueves', label: 'Jueves', short: 'J' },
-    { id: 'viernes', label: 'Viernes', short: 'V' },
-    { id: 'sábado', label: 'Sábado', short: 'S' },
-    { id: 'domingo', label: 'Domingo', short: 'D' },
+const DAYS = [
+    { id: 'monday', label: 'L', fullName: 'Lunes' },
+    { id: 'tuesday', label: 'M', fullName: 'Martes' },
+    { id: 'wednesday', label: 'X', fullName: 'Miércoles' },
+    { id: 'thursday', label: 'J', fullName: 'Jueves' },
+    { id: 'friday', label: 'V', fullName: 'Viernes' },
+    { id: 'saturday', label: 'S', fullName: 'Sábado' },
+    { id: 'sunday', label: 'D', fullName: 'Domingo' },
 ];
 
-const TRAINING_FREQUENCY = [
-    { days: 3, label: '3 días/semana', description: 'Ideal para principiantes', icon: '🌱' },
-    { days: 4, label: '4 días/semana', description: 'Balance perfecto', icon: '⚖️' },
-    { days: 5, label: '5 días/semana', description: 'Entrenamiento intenso', icon: '🔥' },
-    { days: 6, label: '6 días/semana', description: 'Máximo rendimiento', icon: '💪' },
-];
+const FEEDBACK_MESSAGES: Record<number, string> = {
+    1: '1 día es un buen comienzo. Cada paso cuenta!',
+    2: '2 días a la semana es perfecto para mantener el hábito.',
+    3: '3 días es excelente para ver resultados consistentes.',
+    4: '¡Excelente elección! 4 días a la semana es perfecto para desarrollar músculo y mejorar resistencia.',
+    5: '5 días demuestra gran compromiso. Asegúrate de descansar bien.',
+    6: '6 días es intenso! Recuerda que el descanso también es importante.',
+    7: '7 días requiere dedicación total. No olvides escuchar a tu cuerpo.',
+};
 
 export default function TrainingDaysScreen() {
     const router = useRouter();
-    const theme = useTheme();
     const { formData, setFormData } = useOnboardingStore();
 
+    const [frequency, setFrequency] = useState(formData.weekly_frequency || 4);
     const [selectedDays, setSelectedDays] = useState<string[]>(
-        formData.availableDays || []
-    );
-    const [selectedFrequency, setSelectedFrequency] = useState<number | null>(
-        formData.trainingDaysPerWeek || null
+        formData.available_days || []
     );
 
     const toggleDay = (dayId: string) => {
@@ -42,177 +44,311 @@ export default function TrainingDaysScreen() {
         );
     };
 
-    const handleContinue = () => {
-        if (selectedDays.length === 0 || !selectedFrequency) return;
+    const selectAllDays = () => {
+        if (selectedDays.length === 7) {
+            setSelectedDays([]);
+        } else {
+            setSelectedDays(DAYS.map(d => d.id));
+        }
+    };
 
+    const handleContinue = () => {
         setFormData({
-            availableDays: selectedDays,
-            trainingDaysPerWeek: selectedFrequency,
+            weekly_frequency: frequency,
+            available_days: selectedDays,
         });
         router.push('/onboarding/goals');
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-            <View style={{ paddingTop: 60, paddingHorizontal: 20, paddingBottom: 10 }}>
-                <ProgressBar progress={0.7} color={theme.colors.primary} style={{ height: 6, borderRadius: 3 }} />
-                <Text style={{ marginTop: 10, textAlign: 'right', color: theme.colors.onSurfaceVariant }}>4 de 5</Text>
+        <View style={styles.container}>
+            {/* Progress Indicator */}
+            <View style={styles.headerContainer}>
+                <ProgressIndicator
+                    current={5}
+                    total={6}
+                    onBack={() => router.back()}
+                />
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 24 }}>
-                <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-                    <Text variant="headlineMedium" style={{ fontWeight: 'bold', marginBottom: 8, color: theme.colors.onBackground }}>
-                        Días de Entrenamiento
+            {/* Content */}
+            <ScrollView
+                style={styles.content}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Headline */}
+                <View style={styles.headlineContainer}>
+                    <Text style={styles.headline}>
+                        Establece tu{'\n'}
+                        <Text style={styles.headlineAccent}>Horario</Text>
                     </Text>
-                    <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 32 }}>
-                        Selecciona cuántos días quieres entrenar y qué días tienes disponibles
+                    <Text style={styles.subtitle}>
+                        La consistencia es clave. Elige los días que puedes dedicarte para crear un hábito.
                     </Text>
+                </View>
 
-                    {/* Frecuencia de entrenamiento */}
-                    <Text variant="titleMedium" style={{ fontWeight: 'bold', marginBottom: 12, color: theme.colors.onSurface }}>
-                        ¿Cuántos días por semana?
-                    </Text>
-                    <View style={{ gap: 12, marginBottom: 32 }}>
-                        {TRAINING_FREQUENCY.map((freq, index) => {
-                            const isSelected = selectedFrequency === freq.days;
-                            return (
-                                <Animated.View key={freq.days} entering={FadeInDown.delay(200 + index * 50).duration(400)}>
-                                    <Surface
-                                        style={{
-                                            borderRadius: 12,
-                                            backgroundColor: isSelected ? theme.colors.primaryContainer : theme.colors.surface,
-                                            borderWidth: 2,
-                                            borderColor: isSelected ? theme.colors.primary : 'transparent',
-                                            overflow: 'hidden',
-                                        }}
-                                        elevation={isSelected ? 3 : 1}
-                                    >
-                                        <TouchableRipple
-                                            onPress={() => setSelectedFrequency(freq.days)}
-                                            style={{ padding: 16 }}
-                                        >
-                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                                <Text style={{ fontSize: 24, marginRight: 12 }}>{freq.icon}</Text>
-                                                <View style={{ flex: 1 }}>
-                                                    <Text
-                                                        variant="titleSmall"
-                                                        style={{
-                                                            fontWeight: 'bold',
-                                                            color: isSelected ? theme.colors.onPrimaryContainer : theme.colors.onSurface
-                                                        }}
-                                                    >
-                                                        {freq.label}
-                                                    </Text>
-                                                    <Text
-                                                        variant="bodySmall"
-                                                        style={{ color: theme.colors.onSurfaceVariant }}
-                                                    >
-                                                        {freq.description}
-                                                    </Text>
-                                                </View>
-                                                {isSelected && (
-                                                    <Text style={{ color: theme.colors.primary, fontSize: 20, marginLeft: 8 }}>✓</Text>
-                                                )}
-                                            </View>
-                                        </TouchableRipple>
-                                    </Surface>
-                                </Animated.View>
-                            );
-                        })}
+                {/* Frequency Slider */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Meta Semanal</Text>
+                        <View style={styles.frequencyDisplay}>
+                            <Text style={styles.frequencyNumber}>{frequency}</Text>
+                            <Text style={styles.frequencyLabel}>Días</Text>
+                        </View>
                     </View>
 
-                    {/* Días disponibles */}
-                    <Text variant="titleMedium" style={{ fontWeight: 'bold', marginBottom: 12, color: theme.colors.onSurface }}>
-                        ¿Qué días tienes disponibles?
-                    </Text>
-                    <View style={styles.daysContainer}>
-                        {DAYS_OF_WEEK.map((day) => (
-                            <Chip
-                                key={day.id}
-                                selected={selectedDays.includes(day.id)}
-                                onPress={() => toggleDay(day.id)}
-                                style={[
-                                    styles.dayChip,
-                                    selectedDays.includes(day.id) && {
-                                        backgroundColor: theme.colors.primaryContainer,
-                                    }
-                                ]}
-                                textStyle={{
-                                    color: selectedDays.includes(day.id)
-                                        ? theme.colors.onPrimaryContainer
-                                        : theme.colors.onSurface,
-                                    fontWeight: 'bold',
-                                }}
-                            >
-                                {day.label}
-                            </Chip>
+                    <View style={styles.sliderCard}>
+                        <Slider
+                            style={styles.slider}
+                            minimumValue={1}
+                            maximumValue={7}
+                            step={1}
+                            value={frequency}
+                            onValueChange={setFrequency}
+                            minimumTrackTintColor={COLORS.primary.DEFAULT}
+                            maximumTrackTintColor="#326744"
+                            thumbTintColor={COLORS.primary.DEFAULT}
+                        />
+                        <View style={styles.sliderLabels}>
+                            {[1, 2, 3, 4, 5, 6, 7].map((num) => (
+                                <Text
+                                    key={num}
+                                    style={[
+                                        styles.sliderLabel,
+                                        num === frequency && styles.sliderLabelActive,
+                                    ]}
+                                >
+                                    {num}
+                                </Text>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Feedback Message */}
+                    <View style={styles.feedbackCard}>
+                        <MaterialCommunityIcons
+                            name="check-circle"
+                            size={20}
+                            color={COLORS.primary.DEFAULT}
+                            style={styles.feedbackIcon}
+                        />
+                        <Text style={styles.feedbackText}>
+                            <Text style={styles.feedbackBold}>¡Excelente elección! </Text>
+                            {FEEDBACK_MESSAGES[frequency]}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Day Selector */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Días Preferidos</Text>
+                        <Text style={styles.selectAllButton} onPress={selectAllDays}>
+                            {selectedDays.length === 7 ? 'Deseleccionar' : 'Seleccionar Todos'}
+                        </Text>
+                    </View>
+
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.daysScrollContent}
+                    >
+                        {DAYS.map((day) => (
+                            <View key={day.id} style={styles.dayButtonWrapper}>
+                                <DayButton
+                                    label={day.fullName}
+                                    isSelected={selectedDays.includes(day.id)}
+                                    onPress={() => toggleDay(day.id)}
+                                />
+                            </View>
                         ))}
-                    </View>
+                    </ScrollView>
 
-                    {/* Resumen */}
-                    {selectedDays.length > 0 && selectedFrequency && (
-                        <Animated.View entering={FadeInDown.duration(300)}>
-                            <Surface
-                                style={{
-                                    padding: 16,
-                                    borderRadius: 12,
-                                    marginTop: 24,
-                                    backgroundColor: theme.colors.elevation.level2,
-                                    borderWidth: 1,
-                                    borderColor: theme.colors.outline,
-                                }}
-                                elevation={0}
-                            >
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                    <Text style={{ fontSize: 18, marginRight: 8 }}>📅</Text>
-                                    <Text variant="titleSmall" style={{ fontWeight: 'bold', color: theme.colors.primary }}>
-                                        Tu Plan de Entrenamiento
-                                    </Text>
-                                </View>
-                                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
-                                    • {selectedFrequency} días de entrenamiento por semana
-                                </Text>
-                                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
-                                    • Días disponibles: {selectedDays.length}
-                                </Text>
-                                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
-                                    La IA generará tu rutina optimizada para estos días
-                                </Text>
-                            </Surface>
-                        </Animated.View>
+                    <Text style={styles.daysHint}>Toca para alternar días</Text>
+
+                    {selectedDays.length < frequency && selectedDays.length > 0 && (
+                        <Text style={styles.warningText}>
+                            Selecciona al menos {frequency} días para tu frecuencia semanal
+                        </Text>
                     )}
+                </View>
 
-                    {/* Botones */}
-                    <View style={{ marginTop: 40, gap: 12 }}>
-                        <Button
-                            mode="contained"
-                            onPress={handleContinue}
-                            disabled={selectedDays.length === 0 || !selectedFrequency}
-                            contentStyle={{ height: 50 }}
-                        >
-                            Continuar
-                        </Button>
-                        <Button
-                            mode="outlined"
-                            onPress={() => router.back()}
-                            contentStyle={{ height: 50 }}
-                        >
-                            Atrás
-                        </Button>
-                    </View>
-                </Animated.View>
+                {/* Bottom spacer */}
+                <View style={styles.bottomSpacer} />
             </ScrollView>
+
+            {/* Fixed Bottom Button */}
+            <View style={styles.bottomContainer}>
+                <PrimaryButton
+                    onPress={handleContinue}
+                    icon="arrow-right"
+                    disabled={selectedDays.length < frequency}
+                >
+                    CONTINUAR
+                </PrimaryButton>
+            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    daysContainer: {
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.background.dark,
+    },
+    headerContainer: {
+        paddingTop: 16,
+    },
+    content: {
+        flex: 1,
+    },
+    contentContainer: {
+        paddingHorizontal: 24,
+        paddingTop: 8,
+        paddingBottom: 32,
+    },
+    headlineContainer: {
+        marginBottom: 40,
+    },
+    headline: {
+        fontSize: 32,
+        fontFamily: 'Lexend_700Bold',
+        color: '#ffffff',
+        lineHeight: 38,
+        letterSpacing: -0.5,
+        marginBottom: 12,
+    },
+    headlineAccent: {
+        color: COLORS.primary.DEFAULT,
+    },
+    subtitle: {
+        fontSize: 16,
+        fontFamily: 'Lexend_400Regular',
+        color: 'rgba(255,255,255,0.7)',
+        lineHeight: 26,
+    },
+    section: {
+        marginBottom: 40,
+    },
+    sectionHeader: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontFamily: 'Lexend_700Bold',
+        color: '#ffffff',
+    },
+    frequencyDisplay: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: 4,
+    },
+    frequencyNumber: {
+        fontSize: 24,
+        fontFamily: 'Lexend_700Bold',
+        color: COLORS.primary.DEFAULT,
+    },
+    frequencyLabel: {
+        fontSize: 14,
+        fontFamily: 'Lexend_500Medium',
+        color: 'rgba(255,255,255,0.6)',
+    },
+    sliderCard: {
+        backgroundColor: '#162e20',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        padding: 20,
+    },
+    slider: {
+        width: '100%',
+        height: 40,
+    },
+    sliderLabels: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 4,
+        paddingHorizontal: 4,
+    },
+    sliderLabel: {
+        fontSize: 12,
+        fontFamily: 'Lexend_500Medium',
+        color: 'rgba(255,255,255,0.4)',
+    },
+    sliderLabelActive: {
+        color: COLORS.primary.DEFAULT,
+        fontFamily: 'Lexend_700Bold',
+    },
+    feedbackCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        marginTop: 16,
+        padding: 12,
+        backgroundColor: `${COLORS.primary.DEFAULT}1A`,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: `${COLORS.primary.DEFAULT}33`,
+    },
+    feedbackIcon: {
+        marginTop: 2,
+    },
+    feedbackText: {
+        flex: 1,
+        fontSize: 14,
+        fontFamily: 'Lexend_400Regular',
+        color: 'rgba(255,255,255,0.9)',
+        lineHeight: 20,
+    },
+    feedbackBold: {
+        fontFamily: 'Lexend_700Bold',
+        color: COLORS.primary.DEFAULT,
+    },
+    selectAllButton: {
+        fontSize: 12,
+        fontFamily: 'Lexend_600SemiBold',
+        color: COLORS.primary.DEFAULT,
+    },
+    daysScrollContent: {
+        paddingHorizontal: 0,
         gap: 8,
     },
-    dayChip: {
-        marginBottom: 4,
+    dayButtonWrapper: {
+        width: 90,
+    },
+    daysHint: {
+        textAlign: 'center',
+        fontSize: 12,
+        fontFamily: 'Lexend_400Regular',
+        color: 'rgba(255,255,255,0.4)',
+        marginTop: 12,
+    },
+    warningText: {
+        textAlign: 'center',
+        fontSize: 12,
+        fontFamily: 'Lexend_600SemiBold',
+        color: '#ff6b35',
+        marginTop: 8,
+    },
+    bottomSpacer: {
+        height: 120,
+    },
+    bottomContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingHorizontal: 24,
+        paddingTop: 48,
+        paddingBottom: 32,
+        backgroundColor: 'transparent',
+        shadowColor: COLORS.background.dark,
+        shadowOffset: { width: 0, height: -20 },
+        shadowOpacity: 1,
+        shadowRadius: 30,
     },
 });

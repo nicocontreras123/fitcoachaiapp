@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useGpsTracker } from '../hooks/useGpsTracker';
+import { TimerRunning } from './TimerRunning';
+import { RunningInterval } from '../hooks/useRunningIntervalTimer';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text, Button, Surface, ProgressBar } from 'react-native-paper';
 
@@ -8,11 +10,34 @@ import { useWorkoutStore } from '@/features/workouts/store/useWorkoutStore';
 
 interface RunningTrackerProps {
     targetDistance?: number; // km
+    onTimeUpdate?: (elapsedTime: number) => void;
 }
 
-export const RunningTracker: React.FC<RunningTrackerProps> = ({ targetDistance: propTarget }) => {
+export const RunningTracker: React.FC<RunningTrackerProps> = ({ targetDistance: propTarget, onTimeUpdate }) => {
     const { currentWorkout } = useWorkoutStore();
 
+    // Check if workout has intervals defined and is not empty
+    const workoutIntervals = currentWorkout && 'intervals' in currentWorkout ? (currentWorkout as any).intervals : null;
+    const hasIntervals = Array.isArray(workoutIntervals) && workoutIntervals.length > 0;
+
+    // If workout has intervals, use interval timer instead of GPS tracker
+    if (hasIntervals) {
+        const intervals: RunningInterval[] = workoutIntervals.map((interval: any) => {
+            // Duration in the type is in minutes, but our timer needs seconds
+            const durationInSeconds = interval.duration * 60;
+
+            return {
+                type: interval.type || 'run',
+                duration: durationInSeconds,
+                pace: interval.pace || interval.targetPace || '5:30 min/km',
+                description: interval.description || `Intervalo de ${interval.type}`
+            };
+        });
+
+        return <TimerRunning intervals={intervals} onTimeUpdate={onTimeUpdate} />;
+    }
+
+    // Otherwise, use GPS-based distance tracker
     // Determine target from workout if active (assuming running workout has distance)
     // If not, fall back to prop or default 5km
     const workoutTarget = currentWorkout && 'distance' in currentWorkout ? (currentWorkout as any).distance : undefined;
@@ -56,7 +81,7 @@ export const RunningTracker: React.FC<RunningTrackerProps> = ({ targetDistance: 
                         style={{ backgroundColor: '#16a34a', borderRadius: 28 }}
                         labelStyle={{ fontSize: 18, fontWeight: 'bold' }}
                     >
-                        Iniciar Run
+                        Iniciar Carrera
                     </Button>
                 ) : (
                     <Button

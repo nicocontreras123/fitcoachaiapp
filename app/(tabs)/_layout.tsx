@@ -1,10 +1,9 @@
-import { Tabs, useRouter } from 'expo-router';
-import { View, StyleSheet, Animated, ActivityIndicator } from 'react-native';
+import { Tabs } from 'expo-router';
+import { View, StyleSheet, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface TabBarIconProps {
   name: string;
@@ -14,70 +13,146 @@ interface TabBarIconProps {
 
 function TabBarIcon({ name, color, focused }: TabBarIconProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(0.6)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  const bounceAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (focused) {
+      // Sequence of animations when tab becomes active
+      Animated.sequence([
+        // Initial bounce
+        Animated.spring(bounceAnim, {
+          toValue: 1,
+          friction: 3,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+        // Settle
+        Animated.spring(bounceAnim, {
+          toValue: 0,
+          friction: 5,
+          tension: 80,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Parallel animations for scale, opacity, and rotation (native driver)
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1.15,
           friction: 4,
-          tension: 100,
+          tension: 120,
           useNativeDriver: true,
         }),
-        Animated.timing(rotateAnim, {
+        Animated.timing(opacityAnim, {
           toValue: 1,
-          duration: 300,
+          duration: 200,
           useNativeDriver: true,
         }),
+        Animated.sequence([
+          Animated.timing(rotateAnim, {
+            toValue: 1,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+          Animated.timing(rotateAnim, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+        ]),
       ]).start();
+
+      // Separate glow animation (JS driver)
+      Animated.timing(glowAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
     } else {
+      // Reset animations when tab becomes inactive
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
-          friction: 4,
+          friction: 5,
           useNativeDriver: true,
         }),
-        Animated.timing(rotateAnim, {
-          toValue: 0,
+        Animated.timing(opacityAnim, {
+          toValue: 0.6,
           duration: 200,
           useNativeDriver: true,
         }),
       ]).start();
+
+      // Separate glow animation (JS driver)
+      Animated.timing(glowAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
     }
   }, [focused]);
 
   const rotation = rotateAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '5deg'],
+    outputRange: ['0deg', '12deg'],
+  });
+
+  const bounceTranslate = bounceAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -8],
+  });
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.2],
   });
 
   const getIconName = () => {
     switch (name) {
-      case 'home': return 'home-variant';
-      case 'workouts': return 'dumbbell';
-      case 'tracking': return 'chart-line';
-      case 'profile': return 'account-circle';
+      case 'home': return focused ? 'home' : 'home-outline';
+      case 'workouts': return focused ? 'dumbbell' : 'dumbbell';
+      case 'tracking': return focused ? 'play-circle' : 'play-circle-outline';
+      case 'profile': return focused ? 'account-circle' : 'account-circle-outline';
       default: return 'circle';
     }
   };
 
   return (
     <View style={styles.iconContainer}>
+      {/* Glow background - only uses opacity */}
+      <Animated.View
+        style={[
+          styles.glowBackground,
+          {
+            backgroundColor: color,
+            opacity: glowOpacity,
+          }
+        ]}
+      />
+
+      {/* Icon with animations */}
       <Animated.View
         style={[
           styles.iconWrapper,
           {
-            transform: [{ scale: scaleAnim }, { rotate: rotation }],
-            backgroundColor: focused ? color + '15' : 'transparent',
+            transform: [
+              { scale: scaleAnim },
+              { rotate: rotation },
+              { translateY: bounceTranslate }
+            ],
+            opacity: opacityAnim,
           }
         ]}
       >
-        <MaterialCommunityIcons name={getIconName()} size={focused ? 28 : 24} color={color} />
+        <MaterialCommunityIcons
+          name={getIconName()}
+          size={26}
+          color={color}
+        />
       </Animated.View>
-      {focused && (
-        <View style={[styles.activeDot, { backgroundColor: color }]} />
-      )}
     </View>
   );
 }
@@ -85,36 +160,18 @@ function TabBarIcon({ name, color, focused }: TabBarIconProps) {
 export default function TabsLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, loading } = useAuth();
-  const router = useRouter();
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/onboarding/welcome');
-    }
-  }, [user, loading, router]);
+  // No necesitamos verificar el usuario aquí porque app/index.tsx ya lo hace
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (!session) {
-    return null;
-  }
-
-  const TAB_BAR_HEIGHT = 68;
+  const TAB_BAR_HEIGHT = 65;
   const totalHeight = TAB_BAR_HEIGHT + insets.bottom;
 
-  // Neo-brutalist color scheme
+  // Modern color scheme optimized for dark mode
   const activeColors = {
-    home: '#06b6d4',      // Cyan
-    workouts: '#f43f5e',  // Rose
-    tracking: '#8b5cf6',  // Purple
-    profile: '#10b981',   // Emerald
+    home: '#06b6d4',      // Cyan - Bright and modern
+    workouts: '#f43f5e',  // Rose - Energetic
+    tracking: '#8b5cf6',  // Purple - Dynamic
+    profile: '#10b981',   // Emerald - Fresh
   };
 
   return (
@@ -122,29 +179,31 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: isDark ? '#52525b' : '#a1a1aa',
+        tabBarInactiveTintColor: isDark ? '#71717a' : '#a1a1aa', // Zinc-500/400
         tabBarStyle: {
-          backgroundColor: isDark ? '#18181b' : '#fafafa',
-          borderTopWidth: 0,
+          backgroundColor: isDark ? '#09090b' : '#ffffff', // Zinc-950/White
+          borderTopWidth: 1,
+          borderTopColor: isDark ? '#27272a' : '#e4e4e7', // Zinc-800/Zinc-200
           height: totalHeight,
           paddingBottom: insets.bottom,
-          paddingTop: 8,
+          paddingTop: 10,
+          paddingHorizontal: 8,
           elevation: 0,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: isDark ? 0.3 : 0.1,
-          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: isDark ? 0.4 : 0.05,
+          shadowRadius: 8,
         },
         tabBarLabelStyle: {
-          fontWeight: '700',
-          fontSize: 11,
-          letterSpacing: 0.5,
-          textTransform: 'uppercase',
-          marginTop: -2,
-          marginBottom: 4,
+          fontWeight: '600',
+          fontSize: 10,
+          letterSpacing: 0.3,
+          marginTop: 4,
+          marginBottom: 2,
         },
         tabBarItemStyle: {
-          paddingVertical: 6,
+          paddingVertical: 4,
+          gap: 2,
         }
       }}
     >
@@ -167,7 +226,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="tracking"
         options={{
-          title: 'Track',
+          title: 'Entrenar',
           tabBarActiveTintColor: activeColors.tracking,
           tabBarIcon: ({ color, focused }) => <TabBarIcon name="tracking" color={color} focused={focused} />,
         }}
@@ -189,20 +248,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    height: 40,
   },
   iconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
   },
-  activeDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginTop: 2,
+  glowBackground: {
     position: 'absolute',
-    bottom: -12,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    zIndex: 1,
   },
 });
