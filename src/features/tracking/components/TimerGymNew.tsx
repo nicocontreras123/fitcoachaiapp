@@ -1,13 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, Image, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, IconButton, Surface, ProgressBar } from 'react-native-paper';
+import { Text, Surface, ProgressBar } from 'react-native-paper';
 import { useWorkoutStore } from '@/features/workouts/store/useWorkoutStore';
 import { useUserStore } from '@/features/profile/store/userStore';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Speech from 'expo-speech';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurHeader } from '@/components/timer';
+
+// New hooks
+import { useTimerStateMachine } from '../hooks/useTimerStateMachine';
+import { usePhaseTimer } from '../hooks/usePhaseTimer';
+import { useAudioManager } from '../hooks/useAudioManager';
+import { useGymTimer } from '../hooks/useGymTimer';
+
+// Shared components
+import {
+    TimerDisplay,
+    TimerControls,
+    PhaseIndicator,
+    ExerciseProgress,
+} from './shared';
 
 interface GymTimerProps {
     sessionId?: string;
@@ -16,30 +29,16 @@ interface GymTimerProps {
     onComplete?: () => void;
 }
 
-interface Exercise {
-    name: string;
-    sets: number;
-    reps: number;
-    weight: string;
-    description: string;
-}
-
-interface WarmupCooldown {
-    name: string;
-    duration: number;
-    description: string;
-}
-
 export const TimerGymNew: React.FC<GymTimerProps> = ({
     sessionId = 'default',
     onTimeUpdate,
     workout: workoutProp,
-    onComplete
+    onComplete,
 }) => {
     const { currentWorkout: storeWorkout } = useWorkoutStore();
     const { userData } = useUserStore();
 
-    // Usar el workout pasado como prop, o el del store como fallback
+    // Use workout from props or store
     const currentWorkout = workoutProp || storeWorkout;
 
     const exercises = (currentWorkout as any)?.exercises || [];
@@ -47,104 +46,197 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
     const cooldown = (currentWorkout as any)?.cooldown || [];
     const workoutTitle = currentWorkout?.title || 'Full Body Power';
 
-    const speakIfEnabled = (text: string, options?: any) => {
-        if (userData?.voiceEnabled !== false) {
-            Speech.speak(text, options);
-        }
-    };
+    // State machine for phase management
+    const {
+        transitionTo,
+        reset: resetPhase,
+        isWarmup,
+        isWorkout,
+        isCooldown,
+        isFinished,
+    } = useTimerStateMachine('warmup');
 
-    const [phase, setPhase] = useState<'warmup' | 'workout' | 'cooldown' | 'finished'>('warmup');
-    const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-    const [currentSet, setCurrentSet] = useState(1);
-    const [isResting, setIsResting] = useState(false);
-    const [restTimeLeft, setRestTimeLeft] = useState(60);
-    const [completedSets, setCompletedSets] = useState<{ [key: number]: number }>({});
+    // Gym-specific timer logic
+    const gymTimer = useGymTimer({
+        exercises,
+        warmup,
+        cooldown,
+        defaultRestTime: 60,
+    });
 
-    const currentExercise: Exercise | null = phase === 'workout' && exercises[currentExerciseIndex]
-        ? exercises[currentExerciseIndex]
-        : null;
+    // Audio manager
+    const audio = useAudioManager({
+        voiceEnabled: userData?.voiceEnabled !== false,
+        timerSoundEnabled: userData?.timerSoundEnabled !== false,
+    });
 
-    // Timer de descanso
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
+    // Phase timer for warmup/cooldown
+    const phaseTimer = usePhaseTimer({
+        initialTime: warmup[gymTimer.warmupIndex]?.duration || 0,
+        autoStart: false,
+        onTick: (timeLeft) => {
+            // Countdown announcements
+            if (timeLeft <= 3 && timeLeft > 0) {
+                audio.speakCountdown(timeLeft);
+            }
+        },
+        onComplete: () => {
+            handlePhaseComplete();
+        },
+    });
 
-        if (isResting && restTimeLeft > 0) {
-            interval = setInterval(() => {
-                setRestTimeLeft(prev => {
-                    if (prev <= 1) {
-                        setIsResting(false);
-                        speakIfEnabled('Descanso terminado, siguiente serie', { language: 'es-ES' });
-                        return 60;
-                    }
+    // Rest timer
+    const restTimer = usePhaseTimer({
+        initialTime: 60,
+        autoStart: false,
+        onTick: (timeLeft) => {
+            if (timeLeft <= 3 && timeLeft > 0) {
+                audio.speakCountdown(timeLeft);
+            }
+        },
+        onComplete: () => {
+            audio.announceRestEnd();
+            gymTimer.skipRest();
+        },
+    });
 
-                    if (prev <= 3) {
-                        speakIfEnabled(prev.toString(), {
-                            language: 'es-ES',
-                            pitch: 1.2,
-                            rate: 0.8
-                        });
-                    }
-
-                    return prev - 1;
-                });
-            }, 1000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [isResting, restTimeLeft]);
-
-    // Anunciar ejercicio actual
-    useEffect(() => {
-        if (phase === 'workout' && currentExercise && !isResting) {
-            const announcement = `${currentExercise.name}, serie ${currentSet} de ${currentExercise.sets}, ${currentExercise.reps} repeticiones`;
-            speakIfEnabled(announcement, { language: 'es-ES' });
-        }
-    }, [currentExerciseIndex, currentSet, phase]);
-
-    const handleCompleteSet = () => {
-        if (!currentExercise) return;
-
-        const exerciseKey = currentExerciseIndex;
-        const newCompletedSets = { ...completedSets };
-        newCompletedSets[exerciseKey] = (newCompletedSets[exerciseKey] || 0) + 1;
-        setCompletedSets(newCompletedSets);
-
-        if (currentSet < currentExercise.sets) {
-            setCurrentSet(prev => prev + 1);
-            setIsResting(true);
-            setRestTimeLeft(60);
-            speakIfEnabled('Serie completada, descansa', { language: 'es-ES' });
-        } else {
-            if (currentExerciseIndex < exercises.length - 1) {
-                setCurrentExerciseIndex(prev => prev + 1);
-                setCurrentSet(1);
-                speakIfEnabled('Ejercicio completado, siguiente ejercicio', { language: 'es-ES' });
+    // Handle phase completion
+    const handlePhaseComplete = () => {
+        if (isWarmup) {
+            if (gymTimer.hasMoreWarmup) {
+                // Next warmup exercise
+                gymTimer.nextWarmup();
+                const nextWarmup = warmup[gymTimer.warmupIndex + 1];
+                phaseTimer.setTime(nextWarmup?.duration || 0);
+                audio.announceExercise(nextWarmup?.name);
             } else {
-                setPhase('cooldown');
-                speakIfEnabled('Entrenamiento completado, comienza el enfriamiento', { language: 'es-ES' });
+                // Warmup complete, transition to workout
+                transitionTo('workout');
+                audio.announcePhaseTransition('warmup', 'workout');
+            }
+        } else if (isCooldown) {
+            if (gymTimer.hasMoreCooldown) {
+                // Next cooldown exercise
+                gymTimer.nextCooldown();
+                const nextCooldown = cooldown[gymTimer.cooldownIndex + 1];
+                phaseTimer.setTime(nextCooldown?.duration || 0);
+                audio.announceExercise(nextCooldown?.name);
+            } else {
+                // Cooldown complete, finish workout
+                transitionTo('finished');
+                audio.announcePhaseTransition('cooldown', 'finished');
+                onComplete?.();
             }
         }
     };
 
-    const handleSkipRest = () => {
-        setIsResting(false);
-        setRestTimeLeft(60);
-    };
+    // Sync rest timer with gym timer state
+    useEffect(() => {
+        if (gymTimer.isResting && !restTimer.isActive) {
+            restTimer.setTime(gymTimer.restTimeLeft);
+            restTimer.start();
+        } else if (!gymTimer.isResting && restTimer.isActive) {
+            restTimer.pause();
+        }
+    }, [gymTimer.isResting]);
 
+    // Announce current exercise when it changes
+    useEffect(() => {
+        if (isWorkout && gymTimer.currentExercise && !gymTimer.isResting) {
+            const announcement = `${gymTimer.currentExercise.name}, serie ${gymTimer.currentSet} de ${gymTimer.currentExercise.sets}, ${gymTimer.currentExercise.reps} repeticiones`;
+            audio.announceExercise(announcement);
+        }
+    }, [gymTimer.currentExerciseIndex, gymTimer.currentSet, isWorkout]);
+
+    // Handlers
     const handleStartWorkout = () => {
-        setPhase('workout');
-        speakIfEnabled('Comienza el entrenamiento', { language: 'es-ES' });
+        transitionTo('workout');
+        audio.announcePhaseTransition('warmup', 'workout');
     };
 
-    const handleFinish = () => {
-        setPhase('finished');
-        speakIfEnabled('Entrenamiento finalizado, excelente trabajo', { language: 'es-ES' });
+    const handleCompleteSet = () => {
+        const { currentExercise, isLastSet, isLastExercise } = gymTimer;
+
+        if (!currentExercise) return;
+
+        gymTimer.completeSet();
+
+        if (isLastSet) {
+            if (isLastExercise) {
+                // All exercises complete, go to cooldown
+                transitionTo('cooldown');
+                audio.announcePhaseTransition('workout', 'cooldown');
+
+                if (cooldown.length > 0) {
+                    phaseTimer.setTime(cooldown[0].duration);
+                    audio.announceExercise(cooldown[0].name);
+                }
+            } else {
+                // Next exercise
+                gymTimer.nextExercise();
+                audio.speak('Ejercicio completado, siguiente ejercicio');
+            }
+        } else {
+            // Start rest
+            audio.announceSetComplete(true);
+            restTimer.setTime(60);
+            restTimer.start();
+        }
+    };
+
+    const handleSkipRest = () => {
+        gymTimer.skipRest();
+        restTimer.pause();
+        restTimer.reset();
+    };
+
+    const handleReset = () => {
+        resetPhase();
+        gymTimer.reset();
+        phaseTimer.reset();
+        restTimer.reset();
+        transitionTo('warmup');
+    };
+
+    const handlePlayPausePhase = () => {
+        if (phaseTimer.isActive) {
+
+            phaseTimer.pause();
+            audio.stopTickSound();
+        } else {
+            phaseTimer.resume();
+            audio.startTickSound();
+        }
+    };
+
+    const handleSkipPhase = () => {
+        if (isWarmup) {
+            if (gymTimer.hasMoreWarmup) {
+                gymTimer.nextWarmup();
+                const nextWarmup = warmup[gymTimer.warmupIndex + 1];
+                phaseTimer.setTime(nextWarmup?.duration || 0);
+                audio.announceExercise(nextWarmup?.name);
+            } else {
+                handleStartWorkout();
+            }
+        } else if (isCooldown) {
+            if (gymTimer.hasMoreCooldown) {
+                gymTimer.nextCooldown();
+                const nextCooldown = cooldown[gymTimer.cooldownIndex + 1];
+                phaseTimer.setTime(nextCooldown?.duration || 0);
+                audio.announceExercise(nextCooldown?.name);
+            } else {
+                transitionTo('finished');
+                audio.announcePhaseTransition('cooldown', 'finished');
+                onComplete?.();
+            }
+        }
     };
 
     // WARMUP PHASE
-    if (phase === 'warmup') {
+    if (isWarmup) {
+        const currentWarmupExercise = gymTimer.currentWarmup;
+
         return (
             <View style={styles.container}>
                 <BlurHeader
@@ -159,7 +251,9 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                     <View style={styles.heroContainer}>
                         <View style={styles.heroImageWrapper}>
                             <Image
-                                source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAo8SV9K2nSNmRnltpZfSOP-FY36vOZDMd8NVJLfcHJNfC91AnJymmr42dt8NtUloEXziNBKrUArFq5a5SQJ559WJ1ysDt6OV4VNDpFq6MhYHpW8gLIjYCuh9uknVxhiR5AJNWz6ZaDoHGDbaqR0tVrPHWJdgV4VMbBFhP-1pg7Q8UAw3DqIwrFnKlS8fkDABBzHkEQ6X391eihEO1IRaRrN5iMp55IBmmNXgeD_qWgi64OhM-hGbPNEYHt4JKMFaImBjjoiOI_mww' }}
+                                source={{
+                                    uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAo8SV9K2nSNmRnltpZfSOP-FY36vOZDMd8NVJLfcHJNfC91AnJymmr42dt8NtUloEXziNBKrUArFq5a5SQJ559WJ1ysDt6OV4VNDpFq6MhYHpW8gLIjYCuh9uknVxhiR5AJNWz6ZaDoHGDbaqR0tVrPHWJdgV4VMbBFhP-1pg7Q8UAw3DqIwrFnKlS8fkDABBzHkEQ6X391eihEO1IRaRrN5iMp55IBmmNXgeD_qWgi64OhM-hGbPNEYHt4JKMFaImBjjoiOI_mww',
+                                }}
                                 style={styles.heroImage}
                             />
                             <LinearGradient
@@ -173,16 +267,30 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                                 <Text style={styles.heroTitle}>{workoutTitle}</Text>
                                 <View style={styles.heroStats}>
                                     <View style={styles.heroStat}>
-                                        <MaterialCommunityIcons name="clock-outline" size={16} color="#13ec5b" />
+                                        <MaterialCommunityIcons
+                                            name="clock-outline"
+                                            size={16}
+                                            color="#13ec5b"
+                                        />
                                         <Text style={styles.heroStatText}>55 Min</Text>
                                     </View>
                                     <View style={styles.heroStat}>
-                                        <MaterialCommunityIcons name="fire" size={16} color="#13ec5b" />
+                                        <MaterialCommunityIcons
+                                            name="fire"
+                                            size={16}
+                                            color="#13ec5b"
+                                        />
                                         <Text style={styles.heroStatText}>450 Kcal</Text>
                                     </View>
                                     <View style={styles.heroStat}>
-                                        <MaterialCommunityIcons name="format-list-bulleted" size={16} color="#13ec5b" />
-                                        <Text style={styles.heroStatText}>{exercises.length} Ejercicios</Text>
+                                        <MaterialCommunityIcons
+                                            name="format-list-bulleted"
+                                            size={16}
+                                            color="#13ec5b"
+                                        />
+                                        <Text style={styles.heroStatText}>
+                                            {exercises.length} Ejercicios
+                                        </Text>
                                     </View>
                                 </View>
                             </View>
@@ -202,53 +310,84 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                         {warmup.length > 0 && (
                             <Surface style={styles.exerciseItem} elevation={0}>
                                 <View style={styles.exerciseIcon}>
-                                    <MaterialCommunityIcons name="run" size={20} color="#fbbf24" />
+                                    <MaterialCommunityIcons
+                                        name="run"
+                                        size={20}
+                                        color="#fbbf24"
+                                    />
                                 </View>
                                 <View style={styles.exerciseInfo}>
-                                    <Text style={styles.exerciseName}>Calentamiento: Trote</Text>
+                                    <Text style={styles.exerciseName}>
+                                        Calentamiento: {currentWarmupExercise?.name || 'Trote'}
+                                    </Text>
                                     <Text style={styles.exerciseDetail}>Cardio ligero</Text>
                                 </View>
                                 <View style={styles.exerciseBadge}>
-                                    <Text style={styles.exerciseBadgeText}>5 min</Text>
+                                    <Text style={styles.exerciseBadgeText}>
+                                        {currentWarmupExercise?.duration || 5} min
+                                    </Text>
                                 </View>
                             </Surface>
                         )}
 
                         {/* Main exercises */}
-                        {exercises.map((ex: Exercise, index: number) => {
-                            const isCompleted = (completedSets[index] || 0) >= ex.sets;
-                            const isCurrent = index === currentExerciseIndex && phase === 'workout';
+                        {exercises.map((ex: any, index: number) => {
+                            const isCompleted =
+                                (gymTimer.completedSets[index] || 0) >= ex.sets;
+                            const isCurrent =
+                                index === gymTimer.currentExerciseIndex && isWorkout;
 
                             return (
                                 <Pressable
                                     key={index}
                                     style={[
                                         styles.exerciseItem,
-                                        isCurrent && styles.exerciseItemActive
+                                        isCurrent && styles.exerciseItemActive,
                                     ]}
                                 >
-                                    <View style={[
-                                        styles.exerciseNumber,
-                                        isCurrent && styles.exerciseNumberActive
-                                    ]}>
-                                        <Text style={[
-                                            styles.exerciseNumberText,
-                                            isCurrent && styles.exerciseNumberTextActive
-                                        ]}>{index + 1}</Text>
+                                    <View
+                                        style={[
+                                            styles.exerciseNumber,
+                                            isCurrent && styles.exerciseNumberActive,
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.exerciseNumberText,
+                                                isCurrent && styles.exerciseNumberTextActive,
+                                            ]}
+                                        >
+                                            {index + 1}
+                                        </Text>
                                     </View>
                                     <View style={styles.exerciseInfo}>
-                                        <Text style={[
-                                            styles.exerciseName,
-                                            isCurrent && styles.exerciseNameActive
-                                        ]}>{ex.name}</Text>
-                                        <Text style={styles.exerciseDetail}>{ex.description}</Text>
+                                        <Text
+                                            style={[
+                                                styles.exerciseName,
+                                                isCurrent && styles.exerciseNameActive,
+                                            ]}
+                                        >
+                                            {ex.name}
+                                        </Text>
+                                        <Text style={styles.exerciseDetail}>
+                                            {ex.description}
+                                        </Text>
                                     </View>
                                     <View style={styles.exerciseMeta}>
                                         <View style={styles.exerciseMetaBadge}>
-                                            <Text style={styles.exerciseMetaText}>{ex.sets} x {ex.reps}</Text>
+                                            <Text style={styles.exerciseMetaText}>
+                                                {ex.sets} x {ex.reps}
+                                            </Text>
                                         </View>
-                                        <View style={[styles.exerciseMetaBadge, styles.exerciseMetaBadgePrimary]}>
-                                            <Text style={styles.exerciseMetaTextPrimary}>{ex.weight}</Text>
+                                        <View
+                                            style={[
+                                                styles.exerciseMetaBadge,
+                                                styles.exerciseMetaBadgePrimary,
+                                            ]}
+                                        >
+                                            <Text style={styles.exerciseMetaTextPrimary}>
+                                                {ex.weight}
+                                            </Text>
                                         </View>
                                     </View>
                                 </Pressable>
@@ -264,18 +403,30 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                             colors={['#13ec5b', '#0fb946']}
                             style={styles.buttonGradient}
                         >
-                            <MaterialCommunityIcons name="play" size={24} color="#102216" />
+                            <MaterialCommunityIcons
+                                name="play"
+                                size={24}
+                                color="#102216"
+                            />
                             <Text style={styles.primaryButtonText}>Comenzar</Text>
                         </LinearGradient>
                     </Pressable>
 
                     <View style={styles.secondaryButtons}>
-                        <Pressable style={styles.secondaryButton}>
-                            <MaterialCommunityIcons name="refresh" size={18} color="#9ca3af" />
+                        <Pressable style={styles.secondaryButton} onPress={handleReset}>
+                            <MaterialCommunityIcons
+                                name="refresh"
+                                size={18}
+                                color="#9ca3af"
+                            />
                             <Text style={styles.secondaryButtonText}>Reiniciar</Text>
                         </Pressable>
                         <Pressable style={styles.secondaryButton}>
-                            <MaterialCommunityIcons name="check-circle" size={18} color="#13ec5b" />
+                            <MaterialCommunityIcons
+                                name="check-circle"
+                                size={18}
+                                color="#13ec5b"
+                            />
                             <Text style={styles.secondaryButtonText}>Completar</Text>
                         </Pressable>
                     </View>
@@ -285,7 +436,9 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
     }
 
     // COOLDOWN PHASE
-    if (phase === 'cooldown') {
+    if (isCooldown) {
+        const currentCooldownExercise = gymTimer.currentCooldown;
+
         return (
             <View style={styles.container}>
                 <BlurHeader
@@ -295,38 +448,64 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                 />
 
                 <ScrollView style={styles.content}>
-                    {cooldown.map((item: WarmupCooldown, index: number) => (
-                        <Surface key={index} style={styles.warmupCard} elevation={1}>
-                            <View style={styles.warmupHeader}>
-                                <Text style={styles.warmupName}>{item.name}</Text>
-                                <View style={[styles.durationBadge, { backgroundColor: '#10b981' }]}>
-                                    <Text style={styles.durationText}>{item.duration}s</Text>
+                    <View style={styles.phaseSection}>
+                        <PhaseIndicator phase="cooldown" />
+
+                        <TimerDisplay
+                            timeLeft={phaseTimer.timeLeft}
+                            label="Tiempo restante"
+                            color="#2dd4bf"
+                            size="large"
+                        />
+
+                        {currentCooldownExercise && (
+                            <Surface style={styles.warmupCard} elevation={1}>
+                                <View style={styles.warmupHeader}>
+                                    <Text style={styles.warmupName}>
+                                        {currentCooldownExercise.name}
+                                    </Text>
+                                    <View
+                                        style={[
+                                            styles.durationBadge,
+                                            { backgroundColor: '#10b981' },
+                                        ]}
+                                    >
+                                        <Text style={styles.durationText}>
+                                            {currentCooldownExercise.duration}s
+                                        </Text>
+                                    </View>
                                 </View>
-                            </View>
-                            <Text style={styles.warmupDescription}>{item.description}</Text>
-                        </Surface>
-                    ))}
+                                <Text style={styles.warmupDescription}>
+                                    {currentCooldownExercise.description}
+                                </Text>
+                            </Surface>
+                        )}
+                    </View>
                 </ScrollView>
 
                 <View style={styles.bottomControls}>
-                    <Pressable style={styles.primaryButton} onPress={handleFinish}>
-                        <LinearGradient
-                            colors={['#10b981', '#059669']}
-                            style={styles.buttonGradient}
-                        >
-                            <MaterialCommunityIcons name="check" size={24} color="#ffffff" />
-                            <Text style={styles.primaryButtonText}>Finalizar</Text>
-                        </LinearGradient>
-                    </Pressable>
+                    <TimerControls
+                        isPlaying={phaseTimer.isActive}
+                        onPlayPause={handlePlayPausePhase}
+                        onSkip={handleSkipPhase}
+                        onReset={handleReset}
+                        playButtonColor="#2dd4bf"
+                    />
                 </View>
             </View>
         );
     }
 
     // FINISHED PHASE
-    if (phase === 'finished') {
+    if (isFinished) {
         return (
-            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]} edges={['top', 'left', 'right']}>
+            <SafeAreaView
+                style={[
+                    styles.container,
+                    { justifyContent: 'center', alignItems: 'center' },
+                ]}
+                edges={['top', 'left', 'right']}
+            >
                 <StatusBar hidden />
                 <MaterialCommunityIcons name="trophy" size={80} color="#fbbf24" />
                 <Text style={styles.finishedTitle}>¡Entrenamiento Completado!</Text>
@@ -336,7 +515,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
     }
 
     // WORKOUT PHASE
-    if (!currentExercise) {
+    if (!gymTimer.currentExercise) {
         return (
             <View style={styles.container}>
                 <Text style={styles.errorText}>No hay ejercicios disponibles</Text>
@@ -349,7 +528,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
             <StatusBar hidden />
             <BlurHeader
                 title={workoutTitle}
-                subtitle={`Ejercicio ${currentExerciseIndex + 1} de ${exercises.length}`}
+                subtitle={`Ejercicio ${gymTimer.currentExerciseIndex + 1} de ${gymTimer.totalExercises}`}
                 onBack={() => { }}
             />
 
@@ -357,72 +536,78 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                 {/* Progress bar */}
                 <View style={styles.progressContainer}>
                     <ProgressBar
-                        progress={(currentExerciseIndex + 1) / exercises.length}
+                        progress={gymTimer.exerciseProgress}
                         color="#13ec5b"
                         style={styles.progressBar}
                     />
                 </View>
 
                 {/* Current exercise */}
-                <View style={styles.currentExerciseContainer}>
-                    <Text style={styles.currentExerciseName}>{currentExercise.name}</Text>
+                <ExerciseProgress
+                    currentSet={gymTimer.currentSet}
+                    totalSets={gymTimer.currentExercise.sets}
+                    currentExercise={gymTimer.currentExerciseIndex + 1}
+                    totalExercises={gymTimer.totalExercises}
+                    exerciseName={gymTimer.currentExercise.name}
+                    reps={gymTimer.currentExercise.reps}
+                    weight={gymTimer.currentExercise.weight}
+                    progress={gymTimer.exerciseProgress}
+                />
 
-                    <View style={styles.setsInfo}>
-                        <View style={styles.setCard}>
-                            <Text style={styles.setNumber}>{currentSet}</Text>
-                            <Text style={styles.setLabel}>Serie Actual</Text>
-                        </View>
-
-                        <Text style={styles.separator}>/</Text>
-
-                        <View style={styles.setCard}>
-                            <Text style={styles.totalSets}>{currentExercise.sets}</Text>
-                            <Text style={styles.setLabel}>Total Series</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.repsContainer}>
-                        <MaterialCommunityIcons name="repeat" size={32} color="#13ec5b" />
-                        <Text style={styles.repsText}>{currentExercise.reps} repeticiones</Text>
-                    </View>
-
-                    <View style={styles.weightContainer}>
-                        <MaterialCommunityIcons name="weight-kilogram" size={24} color="#9ca3af" />
-                        <Text style={styles.weightText}>Peso: {currentExercise.weight}</Text>
-                    </View>
-
-                    <Surface style={styles.descriptionCard} elevation={1}>
-                        <Text style={styles.description}>💡 {currentExercise.description}</Text>
-                    </Surface>
-                </View>
+                <Surface style={styles.descriptionCard} elevation={1}>
+                    <Text style={styles.description}>
+                        💡 {gymTimer.currentExercise.description}
+                    </Text>
+                </Surface>
 
                 {/* Rest or Complete */}
-                {isResting ? (
+                {gymTimer.isResting && (
                     <View style={styles.restContainer}>
                         <Text style={styles.restTitle}>DESCANSO</Text>
-                        <Text style={styles.restTimer}>{restTimeLeft}</Text>
-                        <Text style={styles.restSubtitle}>segundos</Text>
+                        <TimerDisplay
+                            timeLeft={restTimer.timeLeft}
+                            label="segundos"
+                            color="#13ec5b"
+                            size="large"
+                        />
                         <Pressable style={styles.skipRestButton} onPress={handleSkipRest}>
-                            <MaterialCommunityIcons name="skip-next" size={24} color="#ffffff" />
+                            <MaterialCommunityIcons
+                                name="skip-next"
+                                size={24}
+                                color="#ffffff"
+                            />
                             <Text style={styles.skipRestText}>Saltar descanso</Text>
                         </Pressable>
                     </View>
-                ) : null}
+                )}
 
                 {/* Exercise list preview */}
                 <View style={styles.exerciseListPreview}>
-                    {exercises.slice(0, 3).map((ex: Exercise, index: number) => {
-                        const isCompleted = (completedSets[index] || 0) >= ex.sets;
-                        const isCurrent = index === currentExerciseIndex;
+                    {exercises.slice(0, 3).map((ex: any, index: number) => {
+                        const isCompleted =
+                            (gymTimer.completedSets[index] || 0) >= ex.sets;
+                        const isCurrent = index === gymTimer.currentExerciseIndex;
 
                         return (
                             <View key={index} style={styles.previewItem}>
                                 {isCompleted ? (
-                                    <MaterialCommunityIcons name="check-circle" size={20} color="#10b981" />
+                                    <MaterialCommunityIcons
+                                        name="check-circle"
+                                        size={20}
+                                        color="#10b981"
+                                    />
                                 ) : isCurrent ? (
-                                    <MaterialCommunityIcons name="play-circle" size={20} color="#13ec5b" />
+                                    <MaterialCommunityIcons
+                                        name="play-circle"
+                                        size={20}
+                                        color="#13ec5b"
+                                    />
                                 ) : (
-                                    <MaterialCommunityIcons name="circle-outline" size={20} color="#9ca3af" />
+                                    <MaterialCommunityIcons
+                                        name="circle-outline"
+                                        size={20}
+                                        color="#9ca3af"
+                                    />
                                 )}
                                 <Text style={styles.previewText}>{ex.name}</Text>
                             </View>
@@ -432,14 +617,18 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
             </ScrollView>
 
             {/* Bottom controls */}
-            {!isResting && (
+            {!gymTimer.isResting && (
                 <View style={styles.bottomControls}>
                     <Pressable style={styles.primaryButton} onPress={handleCompleteSet}>
                         <LinearGradient
                             colors={['#10b981', '#059669']}
                             style={styles.buttonGradient}
                         >
-                            <MaterialCommunityIcons name="check-circle" size={24} color="#ffffff" />
+                            <MaterialCommunityIcons
+                                name="check-circle"
+                                size={24}
+                                color="#ffffff"
+                            />
                             <Text style={styles.primaryButtonText}>Completar Serie</Text>
                         </LinearGradient>
                     </Pressable>
@@ -456,6 +645,11 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
+    },
+    phaseSection: {
+        padding: 24,
+        gap: 24,
+        alignItems: 'center',
     },
     heroContainer: {
         padding: 4,
@@ -712,77 +906,12 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
-    currentExerciseContainer: {
-        padding: 24,
-        alignItems: 'center',
-    },
-    currentExerciseName: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#ffffff',
-        textAlign: 'center',
-        marginBottom: 24,
-    },
-    setsInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    setCard: {
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#193322',
-        borderRadius: 12,
-        minWidth: 100,
-    },
-    setNumber: {
-        fontSize: 36,
-        fontWeight: '700',
-        color: '#13ec5b',
-    },
-    totalSets: {
-        fontSize: 36,
-        fontWeight: '700',
-        color: '#d1d5db',
-    },
-    separator: {
-        fontSize: 36,
-        fontWeight: '700',
-        color: '#6b7280',
-        marginHorizontal: 16,
-    },
-    setLabel: {
-        fontSize: 12,
-        color: '#9ca3af',
-        marginTop: 4,
-    },
-    repsContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        gap: 12,
-    },
-    repsText: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#ffffff',
-    },
-    weightContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        gap: 8,
-    },
-    weightText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#d1d5db',
-    },
     descriptionCard: {
         padding: 16,
         borderRadius: 12,
         backgroundColor: '#193322',
-        width: '100%',
+        marginHorizontal: 16,
+        marginTop: 16,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.05)',
     },
@@ -797,6 +926,7 @@ const styles = StyleSheet.create({
         padding: 32,
         backgroundColor: '#193322',
         marginHorizontal: 16,
+        marginTop: 16,
         borderRadius: 16,
         marginBottom: 16,
     },
@@ -806,16 +936,6 @@ const styles = StyleSheet.create({
         color: '#13ec5b',
         marginBottom: 16,
     },
-    restTimer: {
-        fontSize: 72,
-        fontWeight: '900',
-        color: '#ffffff',
-    },
-    restSubtitle: {
-        fontSize: 14,
-        color: '#9ca3af',
-        marginBottom: 24,
-    },
     skipRestButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -824,6 +944,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 9999,
+        marginTop: 16,
     },
     skipRestText: {
         fontSize: 14,
@@ -854,6 +975,7 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         borderRadius: 12,
         backgroundColor: '#193322',
+        width: '90%',
     },
     warmupHeader: {
         flexDirection: 'row',

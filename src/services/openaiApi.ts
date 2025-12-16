@@ -88,47 +88,66 @@ export class OpenAIService {
            "restTime": 60, 
            "exercises": [
              {
-               "name": "COMBINACIÓN RÁPIDA 1-1-2",
+               "name": "[COMBINACIÓN TIPO 1]",
                "duration": 30,
-               "description": "Golpea jab izquierdo, jab izquierdo, cross derecho. Repite 10 veces rápido"
+               "description": "[Descripción técnica específica con números exactos]"
              },
              {
-               "name": "POTENCIA 2-3-2",
+               "name": "[COMBINACIÓN TIPO 2]",
                "duration": 30,
-               "description": "Cross derecho, hook izquierdo, cross derecho. Máxima potencia, 8 repeticiones"
+               "description": "[Descripción técnica específica con números exactos]"
              },
              {
-               "name": "VELOCIDAD PURA",
+               "name": "[EJERCICIO VELOCIDAD/POTENCIA]",
                "duration": 20,
-               "description": "Jabs continuos lo más rápido posible durante 20 segundos"
+               "description": "[Descripción específica con duración]"
              },
              {
-               "name": "BURPEES EXPLOSIVOS",
+               "name": "[EJERCICIO FÍSICO]",
                "duration": 30,
-               "description": "Haz 5 burpees con máxima explosividad"
+               "description": "[Descripción con repeticiones exactas]"
              },
              {
-               "name": "COMBINACIÓN AVANZADA 1-2-3-2",
+               "name": "[COMBINACIÓN AVANZADA]",
                "duration": 40,
-               "description": "Jab, cross, hook, cross. Repite 12 veces con buena técnica"
+               "description": "[Descripción técnica con repeticiones]"
              },
              {
-               "name": "DEFENSA Y CONTRAATAQUE",
+               "name": "[DEFENSA + CONTRAATAQUE]",
                "duration": 30,
-               "description": "Slip derecha + cross, slip izquierda + hook. Alterna 10 veces"
+               "description": "[Descripción de movimiento defensivo y ofensivo]"
              }
            ]
+         },
+         { 
+           "roundNumber": 2, 
+           "workTime": 180, 
+           "restTime": 60, 
+           "exercises": [
+             {"name": "[COMBINACIÓN DIFERENTE 1]", "duration": 30, "description": "[Nueva descripción]"},
+             {"name": "[COMBINACIÓN DIFERENTE 2]", "duration": 30, "description": "[Nueva descripción]"},
+             {"name": "[EJERCICIO FOOTWORK/MOVIMIENTO]", "duration": 30, "description": "[Descripción específica]"},
+             {"name": "[EJERCICIO FÍSICO DIFERENTE]", "duration": 30, "description": "[Descripción con tiempo/reps]"},
+             {"name": "[COMBINACIÓN VARIADA]", "duration": 30, "description": "[Descripción técnica]"},
+             {"name": "[DEFENSA VARIADA]", "duration": 30, "description": "[Descripción de técnica defensiva]"}
+           ]
          }
-       ] (mínimo 3 rounds con 4-6 ejercicios específicos por round),
+         // ... CONTINÚA generando rounds hasta completar el totalDuration
+         // Ejemplo: Si totalDuration=50min, warmup=6min, cooldown=3min
+         // → Debes generar aproximadamente 10 rounds (no solo 2 o 3)
+         // CALCULA: (50-6-3)*60 / (180+60) = 2460/240 = ~10 rounds
+         // ⚠️ IMPORTANTE: Cada round debe tener ejercicios DIFERENTES y VARIADOS
+         // No repitas las mismas combinaciones en todos los rounds
+       ],
        "warmup": [
-         {"name": "Saltos de cuerda", "duration": 180, "description": "3 minutos continuos a ritmo moderado"},
-         {"name": "Sombra ligera", "duration": 120, "description": "Movimiento y técnica básica sin golpear fuerte"},
-         {"name": "Movilidad articular", "duration": 60, "description": "Círculos de brazos y rotaciones de cadera"}
+         {"name": "[Ejercicio cardio]", "duration": 180, "description": "[Descripción específica]"},
+         {"name": "[Ejercicio técnico]", "duration": 120, "description": "[Descripción específica]"},
+         {"name": "[Ejercicio movilidad]", "duration": 60, "description": "[Descripción específica]"}
        ], 
        "cooldown": [
-         {"name": "Estiramiento de brazos", "duration": 60, "description": "Estira hombros, tríceps y bíceps"},
-         {"name": "Estiramiento de piernas", "duration": 60, "description": "Cuádriceps, isquiotibiales y gemelos"},
-         {"name": "Respiración profunda", "duration": 60, "description": "Recupera el ritmo cardíaco con respiraciones lentas"}
+         {"name": "[Estiramiento grupo 1]", "duration": 60, "description": "[Descripción específica]"},
+         {"name": "[Estiramiento grupo 2]", "duration": 60, "description": "[Descripción específica]"},
+         {"name": "[Recuperación]", "duration": 60, "description": "[Descripción específica]"}
        ]
     }
 
@@ -137,16 +156,50 @@ export class OpenAIService {
     - SIEMPRE incluir "cooldown" con 2-3 ejercicios (total 5-10 minutos)
     - El warmup debe preparar específicamente para el tipo de entrenamiento
     - El cooldown debe incluir estiramientos específicos para los músculos trabajados
+    - ⚠️ VARÍA LOS EJERCICIOS: NO uses siempre los mismos ejercicios de warmup/cooldown
+    - Ejemplos warmup boxeo: saltos de cuerda, sombra, skipping, jumping jacks, movilidad articular, rotaciones
+    - Ejemplos cooldown boxeo: estiramientos brazos/hombros/piernas, respiración, foam roller, yoga poses
+    - SÉ CREATIVO y varía según el objetivo del día
 
+    ⚠️ CRÍTICO PARA BOXEO - PROCESO DE GENERACIÓN:
+    
+    PASO 1: Decide cuántos rounds generar
+    - Usa la GUÍA DE ROUNDS según duración objetivo:
+      * Para 20-25 min → genera 3-4 rounds
+      * Para 30-35 min → genera 5-7 rounds  
+      * Para 40-50 min → genera 8-12 rounds
+      * Para 50-60 min → genera 12-15 rounds
+    
+    PASO 2: Genera los rounds
+    - Cada round: workTime 180s (3 min), restTime 60s (1 min)
+    - Cada round: 4-6 ejercicios específicos (suma ~180s)
+    - IMPORTANTE: Genera TODOS los rounds (ej: si decidiste 10 rounds, genera los 10)
+    
+    PASO 3: Calcula totalDuration EXACTO
+    - Warmup total (suma duraciones): ej. 180+120+60 = 360s = 6 min
+    - Rounds: (número_rounds × 3 min trabajo) + ((número_rounds-1) × 1 min descanso)
+      Ejemplo con 10 rounds: (10 × 3) + (9 × 1) = 30 + 9 = 39 min
+    - Cooldown total (suma duraciones): ej. 60+60+60 = 180s = 3 min
+    - totalDuration = warmup + rounds + cooldown
+      Ejemplo: 6 + 39 + 3 = 48 min
+    
+    ⚠️ VERIFICACIÓN OBLIGATORIA:
+    - Si el usuario pide ~45-50 min y solo generas 2-3 rounds → ESTÁ MAL
+    - Debes generar 8-12 rounds para llegar a 45-50 min
+    - El totalDuration DEBE coincidir con la suma real de componentes
+    - Cada round debe tener workTime entre 120-180 segundos (2-3 minutos)
+    - Cada round debe tener restTime entre 30-60 segundos
+    - CADA ROUND debe tener 4-6 ejercicios específicos diferentes
+    - La suma de duraciones de ejercicios debe aproximarse al workTime del round
+    
     IMPORTANTE PARA BOXEO:
     - Cada ejercicio debe ser MUY ESPECÍFICO con números exactos (ej: "Repite 10 veces", "Haz 5 burpees", "Durante 20 segundos")
     - Usa nomenclatura de boxeo: 1=Jab, 2=Cross, 3=Hook, 4=Uppercut
     - Incluye combinaciones variadas: 1-1-2, 1-2-3, 2-3-2, 1-2-3-2, etc.
     - Mezcla ejercicios de golpeo con ejercicios físicos (burpees, sentadillas, flexiones)
-    - Cada round debe tener 4-6 ejercicios específicos
-    - La duración de cada ejercicio debe sumar aproximadamente el workTime del round
     - Incluye ejercicios de defensa (slip, roll, duck) con contraataques
-    - Varía la intensidad: velocidad, potencia, técnica, resistencia
+    - Varía la intensidad entre rounds: velocidad, potencia, técnica, resistencia
+    - VARÍA los ejercicios entre rounds para mantener el entrenamiento dinámico
 
     2. Running:
     {
@@ -212,18 +265,25 @@ export class OpenAIService {
        "totalDuration": número (min),
        "difficulty": "beginner" | "intermediate" | "advanced",
        "exercises": [ 
-         { "name": "Sentadillas", "sets": 3, "reps": 12, "weight": "Moderado", "description": "Baja hasta 90 grados, sube explosivo" },
-         { "name": "Press de banca", "sets": 4, "reps": 10, "weight": "Moderado-Alto", "description": "Controla la bajada, empuje explosivo" }
+         { "name": "[Ejercicio 1]", "sets": 3, "reps": 12, "weight": "Moderado", "description": "[Técnica específica]" },
+         { "name": "[Ejercicio 2]", "sets": 4, "reps": 10, "weight": "Moderado-Alto", "description": "[Técnica específica]" }
        ],
        "warmup": [
-         {"name": "Cardio ligero", "duration": 300, "description": "5 minutos de trote o bicicleta estática"},
-         {"name": "Movilidad dinámica", "duration": 180, "description": "Círculos de brazos, rotaciones de cadera, estocadas caminando"}
+         {"name": "[Ejercicio cardio]", "duration": 300, "description": "[Descripción específica]"},
+         {"name": "[Movilidad dinámica]", "duration": 180, "description": "[Descripción específica]"}
        ], 
        "cooldown": [
-         {"name": "Estiramiento completo", "duration": 180, "description": "Estira todos los grupos musculares trabajados"},
-         {"name": "Foam roller", "duration": 120, "description": "Libera tensión muscular con rodillo"}
+         {"name": "[Estiramiento]", "duration": 180, "description": "[Descripción específica]"},
+         {"name": "[Recuperación]", "duration": 120, "description": "[Descripción específica]"}
        ]
     }
+    
+    ⚠️ CREATIVIDAD Y VARIACIÓN - MUY IMPORTANTE:
+    - NUNCA copies exactamente los ejemplos mostrados arriba
+    - Los ejercicios de warmup/cooldown deben VARIAR en cada rutina
+    - Adapta los ejercicios al nivel del usuario, objetivos y equipamiento disponible
+    - Sé creativo con nombres de combinaciones y descripciones motivadoras
+    - Cada rutina debe sentirse única y personalizada
     
     IMPORTANTE: "workout" NO puede ser null si "restDay" es false. Asegura que todos los campos requeridos (title, description, totalDuration, difficulty, warmup, cooldown) estén presentes.`;
 
@@ -242,7 +302,62 @@ export class OpenAIService {
 
     const equipmentList = userProfile?.equipment?.map(eq => equipmentMap[eq] || eq).join(', ') || 'Sin equipamiento específico';
 
-    const userPrompt = `Usuario: ${userProfile?.age} años, ${userProfile?.weight}kg.\n    Deportes: ${userProfile?.deportes?.join(', ') || sport}.\n    Objetivos: ${goals}.\n    Días de entrenamiento esta semana: ${availableDays?.join(', ') || 'Todos'}.\n    Días por semana objetivo: ${userProfile?.trainingDaysPerWeek || availableDays?.length || 3}.\n    Equipamiento disponible: ${equipmentList}.\n    \n    ⚠️ OBLIGATORIO - EQUIPAMIENTO:\n    - USA SOLO el equipamiento disponible: ${equipmentList}\n    - Si tiene trotadora, úsala para cardio y warmup\n    - Si tiene saco de boxeo, úsalo en entrenamientos de boxeo\n    - Si tiene pesas, inclúyelas en ejercicios de fuerza\n    - Si NO tiene equipamiento, usa solo ejercicios de peso corporal\n    - NUNCA sugieras equipamiento que el usuario NO tiene\n    \n    IMPORTANTE: \n    - Solo genera entrenamientos para estos días: ${availableDays?.join(', ')}\n    - Los demás días márcalos como \"restDay\": true\n    - Distribuye ${userProfile?.trainingDaysPerWeek || availableDays?.length} entrenamientos en los días disponibles\n    - Si hay múltiples deportes, alterna entre ellos\n    \n    Genera una rutina equilibrada y variada.`;
+    // Map fitness level to Spanish
+    const levelMap: { [key: string]: string } = {
+      'beginner': 'Principiante',
+      'intermediate': 'Intermedio',
+      'advanced': 'Avanzado'
+    };
+    const userLevel = userProfile?.level ? levelMap[userProfile.level] : 'Intermedio';
+
+    const userPrompt = `Usuario: ${userProfile?.age} años, ${userProfile?.weight}kg.
+    Nivel de fitness: ${userLevel} (${userProfile?.level || 'intermediate'}).
+    Deportes: ${userProfile?.deportes?.join(', ') || sport}.
+    Objetivos: ${goals}.
+    Días de entrenamiento esta semana: ${availableDays?.join(', ') || 'Todos'}.
+    Días por semana objetivo: ${userProfile?.trainingDaysPerWeek || availableDays?.length || 3}.
+    Equipamiento disponible: ${equipmentList}.
+    
+    ⚠️ OBLIGATORIO - NIVEL DEL USUARIO:
+    - El usuario es ${userLevel} (${userProfile?.level || 'intermediate'})
+    - AJUSTA la dificultad de TODOS los entrenamientos a su nivel:
+      * Principiante: Ejercicios básicos, menos repeticiones, más descanso, técnica sobre intensidad
+      * Intermedio: Ejercicios variados, volumen moderado, buena intensidad
+      * Avanzado: Ejercicios complejos, alto volumen, alta intensidad, menos descanso
+    - El campo "difficulty" de cada workout DEBE ser: "${userProfile?.level || 'intermediate'}"
+    - Para boxeo (principiante): 3-5 rounds, workTime 120-150s, combinaciones simples
+    - Para boxeo (intermedio): 6-10 rounds, workTime 150-180s, combinaciones variadas
+    - Para boxeo (avanzado): 10-15 rounds, workTime 180s, combinaciones complejas
+    
+    ⚠️ OBLIGATORIO - EQUIPAMIENTO:
+    - USA SOLO el equipamiento disponible: ${equipmentList}
+    - Si tiene trotadora, úsala para cardio y warmup
+    - Si tiene saco de boxeo, úsalo en entrenamientos de boxeo
+    - Si tiene pesas, inclúyelas en ejercicios de fuerza
+    - Si NO tiene equipamiento, usa solo ejercicios de peso corporal
+    - NUNCA sugieras equipamiento que el usuario NO tiene
+    
+    IMPORTANTE: 
+    - Solo genera entrenamientos para estos días: ${availableDays?.join(', ')}
+    - Los demás días márcalos como "restDay": true
+    - Distribuye ${userProfile?.trainingDaysPerWeek || availableDays?.length} entrenamientos en los días disponibles
+    - Si hay múltiples deportes, alterna entre ellos
+    
+    ⚠️ CRÍTICO - DURACIÓN TOTAL:
+    - El campo "totalDuration" de cada workout DEBE ser la suma EXACTA de:
+      warmup + rounds + cooldown (en minutos)
+    - Para boxeo: totalDuration = warmup + (rounds × workTime) + ((rounds-1) × restTime) + cooldown
+    - NO inventes un totalDuration arbitrario, CALCULA basándote en los componentes reales
+    - Ejemplo: Si generas 3 rounds de 3min + 1min descanso, warmup 5min, cooldown 3min:
+      → totalDuration = 5 + (3×3) + (2×1) + 3 = 5 + 9 + 2 + 3 = 19 min (NO 50 min)
+    
+    ⚠️ PARA BOXEO - CANTIDAD DE ROUNDS:
+    - Si el usuario entrena 3-4 días/semana → genera workouts de 40-50 min → 8-12 rounds
+    - Si el usuario entrena 5-6 días/semana → genera workouts de 25-35 min → 5-7 rounds
+    - NUNCA generes solo 2-3 rounds para un workout de 40-50 min
+    - Ejemplo: Para 45 min total, genera 10 rounds (warmup 6min + 10 rounds×3min + 9 descansos×1min + cooldown 3min = 48min)
+    
+    Genera una rutina equilibrada y variada ADAPTADA AL NIVEL ${userLevel.toUpperCase()} del usuario.`;
 
     try {
       if (!isApiConfigured()) {

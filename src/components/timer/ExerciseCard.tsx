@@ -13,6 +13,7 @@ interface ExerciseCardProps {
     onPlayDemo?: () => void;
     colors?: [string, string];
     animated?: boolean;
+    combinationTimeLeft?: number; // Time left for current combination in seconds
 }
 
 export const ExerciseCard: React.FC<ExerciseCardProps> = ({
@@ -25,6 +26,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
     onPlayDemo,
     colors = ['#ec1313', '#f97316'],
     animated = true,
+    combinationTimeLeft,
 }) => {
     const glowAnim = useRef(new Animated.Value(0)).current;
 
@@ -86,6 +88,11 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 {/* Content */}
                 <View style={styles.content}>
                     <View style={styles.textContent}>
+                        {combinationTimeLeft !== undefined && (
+                            <Text style={styles.combinationTime}>
+                                Tiempo combinación: {combinationTimeLeft}s
+                            </Text>
+                        )}
                         <Text style={styles.title}>{title}</Text>
                         <Text style={styles.description}>{description}</Text>
                     </View>
@@ -174,6 +181,13 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 20,
         gap: 8,
+    },
+    combinationTime: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#ec1313',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     title: {
         fontSize: 24,

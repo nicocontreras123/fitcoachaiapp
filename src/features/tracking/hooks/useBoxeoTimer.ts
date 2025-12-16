@@ -1,279 +1,313 @@
-import { useState, useEffect, useRef } from 'react';
-import * as Speech from 'expo-speech';
-import { useAudioPlayer, AudioSource } from 'expo-audio';
+import { useReducer, useCallback, useMemo, useEffect, useRef } from 'react';
+import { RoundStructure } from '../types/timer.types';
+import { useAudioManager } from './useAudioManager';
 
-interface TimerState {
+/**
+ * Refactored Boxing Timer Hook
+ * Uses reducer pattern for predictable state management
+ * Integrates with useAudioManager for centralized audio
+ */
+
+interface BoxingTimerState {
     isActive: boolean;
     round: number;
-    timeLeft: number; // seconds
+    timeLeft: number;
     isRest: boolean;
-    isPreparing: boolean; // New preparation phase
+    isPreparing: boolean;
     totalRounds: number;
 }
 
-export interface RoundStructure {
-    roundNumber: number;
-    workTime: number;
-    restTime: number;
-    exercises?: { name: string; duration: number; description?: string }[];
-}
+type BoxingTimerAction =
+    | { type: 'START' }
+    | { type: 'PAUSE' }
+    | { type: 'TICK' }
+    | { type: 'START_ROUND'; payload: { round: number; duration: number } }
+    | { type: 'START_REST'; payload: { duration: number } }
+    | { type: 'FINISH_PREP'; payload: { duration: number } }
+    | { type: 'SKIP_TO_NEXT' }
+    | { type: 'RESET'; payload: { prepTime: number; totalRounds: number } };
 
 interface TimerConfig {
     roundDuration?: number;
     restDuration?: number;
     totalRounds?: number;
-    rounds?: RoundStructure[]; // Structured workout
-    prepTime?: number; // Preparation time in seconds (default: 10)
-    timerSoundEnabled?: boolean; // Control de sonidos (default: true)
+    rounds?: RoundStructure[];
+    prepTime?: number;
+    timerSoundEnabled?: boolean;
+    voiceEnabled?: boolean;
+    onWorkoutComplete?: () => void; // Callback when all rounds finish
 }
 
-export const useBoxeoTimer = (sessionId: string, config?: TimerConfig) => {
-    // Determine initial duration based on first round if structured, else default
-    const getRoundDuration = (roundNum: number) => {
-        if (config?.rounds && config.rounds[roundNum - 1]) {
-            return config.rounds[roundNum - 1].workTime;
-        }
-        return config?.roundDuration || 180;
-    };
+const boxingTimerReducer = (
+    state: BoxingTimerState,
+    action: BoxingTimerAction
+): BoxingTimerState => {
+    switch (action.type) {
+        case 'START':
+            return { ...state, isActive: true };
 
-    const getRestDuration = (roundNum: number) => {
-        if (config?.rounds && config.rounds[roundNum - 1]) {
-            return config.rounds[roundNum - 1].restTime;
-        }
-        return config?.restDuration || 60;
-    };
+        case 'PAUSE':
+            return { ...state, isActive: false };
 
-    const totalRounds = config?.rounds ? config.rounds.length : (config?.totalRounds || 12);
-    const prepTime = config?.prepTime !== undefined ? config.prepTime : 10; // Default 10 seconds
+        case 'TICK':
+            return {
+                ...state,
+                timeLeft: Math.max(0, state.timeLeft - 1),
+            };
 
-    const [state, setState] = useState<TimerState>({
+        case 'START_ROUND':
+            return {
+                ...state,
+                round: action.payload.round,
+                timeLeft: action.payload.duration,
+                isRest: false,
+                isPreparing: false,
+            };
+
+        case 'START_REST':
+            return {
+                ...state,
+                timeLeft: action.payload.duration,
+                isRest: true,
+            };
+
+        case 'FINISH_PREP':
+            return {
+                ...state,
+                isPreparing: false,
+                isRest: false,
+                timeLeft: action.payload.duration,
+            };
+
+        case 'RESET':
+            return {
+                isActive: false,
+                round: 1,
+                timeLeft: action.payload.prepTime,
+                isRest: false,
+                isPreparing: true,
+                totalRounds: action.payload.totalRounds,
+            };
+
+        default:
+            return state;
+    }
+};
+
+export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
+    const {
+        roundDuration = 180,
+        restDuration = 60,
+        rounds,
+        prepTime = 10,
+        timerSoundEnabled = true,
+        voiceEnabled = true,
+        onWorkoutComplete,
+    } = config || {};
+
+    // Helper functions
+    const getRoundDuration = useCallback(
+        (roundNum: number) => {
+            if (rounds && rounds[roundNum - 1]) {
+                return rounds[roundNum - 1].workTime;
+            }
+            return roundDuration;
+        },
+        [rounds, roundDuration]
+    );
+
+    const getRestDuration = useCallback(
+        (roundNum: number) => {
+            if (rounds && rounds[roundNum - 1]) {
+                return rounds[roundNum - 1].restTime;
+            }
+            return restDuration;
+        },
+        [rounds, restDuration]
+    );
+
+    const totalRounds = useMemo(
+        () => rounds?.length || config?.totalRounds || 12,
+        [rounds, config?.totalRounds]
+    );
+
+    // State
+    const [state, dispatch] = useReducer(boxingTimerReducer, {
         isActive: false,
         round: 1,
         timeLeft: prepTime,
         isRest: false,
-        isPreparing: true, // Start in preparation mode
-        totalRounds: totalRounds,
+        isPreparing: true,
+        totalRounds,
     });
 
+    // Audio manager
+    const audio = useAudioManager({
+        voiceEnabled,
+        timerSoundEnabled,
+    });
+
+    // Refs for countdown tracking
     const hasSpokenCountdownRef = useRef<Set<number>>(new Set());
-    const tickPlayer = useAudioPlayer(require('../../../../assets/tictac.mp3') as AudioSource, { loop: true });
-    const bellPlayer = useAudioPlayer(require('../../../../assets/campana.mp3') as AudioSource);
-    const tickIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const prevTimeLeftRef = useRef(state.timeLeft);
+    const hasAnnouncedPrepRef = useRef(false);
 
-    // Set audio player volumes
+    // Announce preparation phase start
     useEffect(() => {
-        tickPlayer.volume = 0.8;
-        bellPlayer.volume = 1.0;
-    }, []);
+        if (state.isPreparing && state.isActive && !hasAnnouncedPrepRef.current) {
+            audio.speak('Prepárate', { language: 'es-ES', pitch: 1.1, rate: 0.9 });
+            hasAnnouncedPrepRef.current = true;
+        }
 
-    // Play/pause tick-tack sound based on timer state
+        // Reset when not preparing
+        if (!state.isPreparing) {
+            hasAnnouncedPrepRef.current = false;
+        }
+    }, [state.isPreparing, state.isActive, audio]);
+
+    // Timer tick effect
     useEffect(() => {
-        const soundsEnabled = config?.timerSoundEnabled !== false;
+        console.log('⏱️ [TIMER_TICK] Effect triggered', {
+            isActive: state.isActive,
+            timeLeft: state.timeLeft,
+            willCreateInterval: state.isActive && state.timeLeft > 0,
+        });
 
-        if (state.isActive && soundsEnabled) {
+        let interval: ReturnType<typeof setInterval>;
 
-            try {
-                if (tickPlayer && !tickPlayer.playing) {
-                    tickPlayer.play();
-                }
-            } catch (error) {
-                console.error('Error playing tick sound:', error);
-            }
+        if (state.isActive && state.timeLeft > 0) {
+
+            interval = setInterval(() => {
+
+                dispatch({ type: 'TICK' });
+            }, 1000);
         } else {
-
-            try {
-                if (tickPlayer && tickPlayer.playing) {
-                    tickPlayer.pause();
-                }
-            } catch (error) {
-                console.error('Error pausing tick sound:', error);
-            }
+            console.log('❌ [TIMER_TICK] Not creating interval', {
+                reason: !state.isActive ? 'not active' : 'time is 0',
+            });
         }
 
         return () => {
-            try {
-                if (tickPlayer && tickPlayer.playing) {
-                    tickPlayer.pause();
-                }
-            } catch (error) {
-                // Silently ignore cleanup errors
+            if (interval) {
+
+                clearInterval(interval);
             }
         };
-    }, [state.isActive, config?.timerSoundEnabled]);
+    }, [state.isActive, state.timeLeft]);
 
-    // Handle countdown announcement (3, 2, 1)
+    // Countdown announcements (3, 2, 1)
     useEffect(() => {
         if (state.isActive && state.timeLeft <= 3 && state.timeLeft > 0) {
-            // Check if we haven't spoken this number yet
-            const currentPhaseKey = `${state.round}-${state.isRest ? 'rest' : state.isPreparing ? 'prep' : 'work'}-${state.timeLeft}`;
-
             if (!hasSpokenCountdownRef.current.has(state.timeLeft)) {
                 hasSpokenCountdownRef.current.add(state.timeLeft);
-                Speech.speak(state.timeLeft.toString(), {
-                    language: 'es-ES',
-                    pitch: 1.2,
-                    rate: 1.0,
-                });
+                audio.speakCountdown(state.timeLeft);
             }
         }
 
-        // Reset countdown tracking when phase changes
+        // Reset countdown tracking when time > 3
         if (state.timeLeft > 3) {
             hasSpokenCountdownRef.current.clear();
         }
-    }, [state.timeLeft, state.isActive, state.round, state.isRest, state.isPreparing]);
+    }, [state.timeLeft, state.isActive, audio]);
 
+    // Phase change when time reaches 0
     useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-        if (state.isActive && state.timeLeft > 0) {
-            interval = setInterval(() => {
-                setState(prev => {
-                    const newState = { ...prev, timeLeft: prev.timeLeft - 1 };
-                    // Broadcast state (optimization: don't broadcast every second if not needed, but for realtime timer we might need to)
-                    // To avoid flooding, maybe broadcast fewer times or rely on local timer + sync events
-                    return newState;
-                });
-            }, 1000);
-        } else if (state.timeLeft === 0) {
+        if (state.timeLeft === 0 && prevTimeLeftRef.current > 0) {
             handlePhaseChange();
         }
-        return () => clearInterval(interval);
-    }, [state.isActive, state.timeLeft, state.isRest]);
+        prevTimeLeftRef.current = state.timeLeft;
+    }, [state.timeLeft]);
 
-    const handlePhaseChange = () => {
-        hasSpokenCountdownRef.current.clear(); // Reset countdown for next phase
+    const handlePhaseChange = useCallback(() => {
+        hasSpokenCountdownRef.current.clear();
 
         if (state.isPreparing) {
             // Finish preparation, start first round
-            playBellSound(); // Play bell when starting first round
-            Speech.speak("Inicia!", {
-                language: 'es-ES',
-                pitch: 1.1,
-                rate: 0.9,
-            });
-            updateState({
-                isPreparing: false,
-                isRest: false,
-                timeLeft: getRoundDuration(1)
-            });
+            const duration = getRoundDuration(1);
+            dispatch({ type: 'FINISH_PREP', payload: { duration } });
+            audio.announceRoundStart(1);
         } else if (state.isRest) {
             // Start next round
             if (state.round < state.totalRounds) {
                 const nextRound = state.round + 1;
-                playBellSound(); // Play bell when starting new round
-                Speech.speak(`Inicia!`, {
-                    language: 'es-ES',
-                    pitch: 1.1,
-                    rate: 0.9,
-                });
-                updateState({
-                    round: nextRound,
-                    isRest: false,
-                    timeLeft: getRoundDuration(nextRound)
-                });
+                const duration = getRoundDuration(nextRound);
+                dispatch({ type: 'START_ROUND', payload: { round: nextRound, duration } });
+                audio.announceRoundStart(nextRound);
             } else {
-                // Finished
-                Speech.speak("Entrenamiento completo!", {
-                    language: 'es-ES',
-                    pitch: 1.0,
-                    rate: 0.9,
-                });
-                updateState({ isActive: false });
+                // Finished all rounds
+                dispatch({ type: 'PAUSE' });
+                audio.speak('Entrenamiento completo!');
+                // Notify component that workout is complete
+                if (onWorkoutComplete) {
+                    onWorkoutComplete();
+                }
             }
         } else {
-            // Start Rest
-            Speech.speak("Descansa", {
-                language: 'es-ES',
-                pitch: 0.9,
-                rate: 0.8,
-            });
-            updateState({
-                isRest: true,
-                timeLeft: getRestDuration(state.round)
-            });
+            // Start rest
+            const duration = getRestDuration(state.round);
+            dispatch({ type: 'START_REST', payload: { duration } });
+            audio.announceRest();
         }
-    };
+    }, [
+        state.isPreparing,
+        state.isRest,
+        state.round,
+        state.totalRounds,
+        getRoundDuration,
+        getRestDuration,
+        audio,
+    ]);
 
-    const playBellSound = () => {
-        // Verificar si los sonidos están habilitados
-        if (config?.timerSoundEnabled === false) {
-
-            return;
-        }
-
-        try {
-            bellPlayer.seekTo(0);
-            bellPlayer.play();
-
-        } catch (error) {
-            console.error('Error playing bell sound:', error);
-        }
-    };
-
-    const updateState = (updates: Partial<TimerState>) => {
-        setState(prev => {
-            const next = { ...prev, ...updates };
-            return next;
+    // Actions
+    const toggleTimer = useCallback(() => {
+        console.log('🎮 [TOGGLE_TIMER] Called', {
+            currentIsActive: state.isActive,
+            willDispatch: state.isActive ? 'PAUSE' : 'START',
         });
-    };
+        dispatch({ type: state.isActive ? 'PAUSE' : 'START' });
+    }, [state.isActive]);
 
-    const toggleTimer = () => {
+    const resetTimer = useCallback(() => {
+        dispatch({ type: 'RESET', payload: { prepTime, totalRounds } });
+        hasSpokenCountdownRef.current.clear();
+    }, [prepTime, totalRounds]);
 
-        updateState({ isActive: !state.isActive });
-    };
-
-    const resetTimer = () => updateState({
-        round: 1,
-        timeLeft: prepTime,
-        isRest: false,
-        isPreparing: true,
-        isActive: false
-    });
-
-    const skipToNextRound = () => {
-        hasSpokenCountdownRef.current.clear(); // Reset countdown
+    const skipToNextRound = useCallback(() => {
+        hasSpokenCountdownRef.current.clear();
 
         if (state.isPreparing) {
             // Skip preparation, go straight to round 1
-            Speech.speak("Inicia!", {
-                language: 'es-ES',
-                pitch: 1.1,
-                rate: 0.9,
-            });
-            updateState({
-                isPreparing: false,
-                isRest: false,
-                round: 1,
-                timeLeft: getRoundDuration(1)
-            });
+            const duration = getRoundDuration(1);
+            dispatch({ type: 'FINISH_PREP', payload: { duration } });
+            audio.announceRoundStart(1);
         } else if (state.isRest) {
             // Skip rest, go to next round
             if (state.round < state.totalRounds) {
                 const nextRound = state.round + 1;
-                Speech.speak(`Inicia!`, {
-                    language: 'es-ES',
-                    pitch: 1.1,
-                    rate: 0.9,
-                });
-                updateState({
-                    round: nextRound,
-                    isRest: false,
-                    timeLeft: getRoundDuration(nextRound)
-                });
+                const duration = getRoundDuration(nextRound);
+                dispatch({ type: 'START_ROUND', payload: { round: nextRound, duration } });
+                audio.announceRoundStart(nextRound);
             }
         } else {
             // Skip current round, go to rest
-            Speech.speak("Descansa", {
-                language: 'es-ES',
-                pitch: 0.9,
-                rate: 0.8,
-            });
-            updateState({
-                isRest: true,
-                timeLeft: getRestDuration(state.round)
-            });
+            const duration = getRestDuration(state.round);
+            dispatch({ type: 'START_REST', payload: { duration } });
+            audio.announceRest();
         }
-    };
+    }, [
+        state.isPreparing,
+        state.isRest,
+        state.round,
+        state.totalRounds,
+        getRoundDuration,
+        getRestDuration,
+        audio,
+    ]);
 
-    return { state, toggleTimer, resetTimer, skipToNextRound };
+    return {
+        state,
+        toggleTimer,
+        resetTimer,
+        skipToNextRound,
+    };
 };

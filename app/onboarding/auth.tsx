@@ -1,4 +1,4 @@
-import { View, StyleSheet, Alert, ImageBackground, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, Alert, ImageBackground, ScrollView, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Text } from 'react-native-paper';
@@ -24,15 +24,16 @@ export default function AuthScreen() {
       return;
     }
 
+
     setLoading(true);
     try {
       if (isLogin) {
+
         await signInWithEmail(email, password);
 
 
         try {
           const user: any = await api.getCurrentUser();
-
 
           // Verificar si completó el onboarding
           if (user && user.hasCompletedOnboarding) {
@@ -43,23 +44,27 @@ export default function AuthScreen() {
             router.replace('/onboarding/personal-info');
           }
         } catch (fetchError) {
-          console.error('Error obteniendo datos del usuario:', fetchError);
+          console.error('❌ Error obteniendo datos del usuario:', fetchError);
           router.replace('/onboarding/personal-info');
         }
 
       } else {
+
         await signUpWithEmail(email, password);
 
-        router.replace('/onboarding/personal-info');
+        await router.replace('/onboarding/personal-info');
       }
     } catch (error: any) {
+      console.error('❌ Error en autenticación:', error.message);
       Alert.alert('Error', error.message || 'Algo salió mal');
     } finally {
       setLoading(false);
+
     }
   };
 
   const handleGoogleAuth = async () => {
+
     setLoading(true);
     try {
       await signInWithGoogle();
@@ -77,13 +82,15 @@ export default function AuthScreen() {
           router.replace('/onboarding/personal-info');
         }
       } catch (fetchError) {
-        console.error('Error obteniendo datos del usuario:', fetchError);
+        console.error('❌ Error obteniendo datos del usuario:', fetchError);
         router.replace('/onboarding/personal-info');
       }
     } catch (error: any) {
+      console.error('❌ Error con Google:', error.message);
       Alert.alert('Error', error.message || 'Algo salió mal con Google');
     } finally {
       setLoading(false);
+
     }
   };
 
@@ -172,13 +179,22 @@ export default function AuthScreen() {
             />
 
             {/* Main Action Button */}
-            <PrimaryButton
-              onPress={handleEmailAuth}
-              icon="arrow-right"
-              disabled={loading}
-            >
-              {isLogin ? 'INICIAR SESIÓN' : 'CREAR CUENTA'}
-            </PrimaryButton>
+            {loading ? (
+              <View style={styles.loadingButton}>
+                <ActivityIndicator size="small" color={COLORS.background.dark} />
+                <Text style={styles.loadingButtonText}>
+                  {isLogin ? 'Iniciando sesión...' : 'Creando cuenta...'}
+                </Text>
+              </View>
+            ) : (
+              <PrimaryButton
+                onPress={handleEmailAuth}
+                icon="arrow-right"
+                disabled={loading}
+              >
+                {isLogin ? 'INICIAR SESIÓN' : 'CREAR CUENTA'}
+              </PrimaryButton>
+            )}
           </View>
 
           {/* Divider */}
@@ -292,6 +308,27 @@ const styles = StyleSheet.create({
   form: {
     gap: 16,
     marginBottom: 24,
+  },
+  loadingButton: {
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary.DEFAULT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    shadowColor: COLORS.primary.DEFAULT,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  loadingButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    color: COLORS.background.dark,
+    textTransform: 'uppercase',
   },
   dividerContainer: {
     flexDirection: 'row',

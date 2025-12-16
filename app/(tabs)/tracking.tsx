@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { TimerBoxeoNew } from '@/features/tracking/components/TimerBoxeoNew';
 import { TimerGymNew } from '@/features/tracking/components/TimerGymNew';
@@ -6,12 +6,13 @@ import { RunningTrackerNew } from '@/features/workouts/components/RunningTracker
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text, Button } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { useWorkoutStore } from '@/features/workouts/store/useWorkoutStore';
 
 export default function TrackingPage() {
   const { currentWorkout } = useWorkoutStore();
   const router = useRouter();
+  const navigation = useNavigation();
   const [elapsedTime, setElapsedTime] = useState(0);
 
   // Determinar el tipo de workout actual
@@ -19,6 +20,15 @@ export default function TrackingPage() {
   const isBoxing = workoutTypeRaw === 'boxing';
   const isGym = workoutTypeRaw === 'gym' || workoutTypeRaw === 'functional';
   const isRunning = workoutTypeRaw === 'running';
+
+  const hasActiveWorkout = isBoxing || isGym || isRunning;
+
+  // Hide tab bar when workout is active
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: hasActiveWorkout ? { display: 'none' } : undefined,
+    });
+  }, [navigation, hasActiveWorkout]);
 
   // Si es boxeo, mostrar solo el timer en pantalla completa
   if (isBoxing && currentWorkout) {

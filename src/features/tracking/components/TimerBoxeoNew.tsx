@@ -1,17 +1,24 @@
-import React, { useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
-import { View, StyleSheet, Animated, ScrollView, Pressable, StatusBar } from 'react-native';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { View, StyleSheet, Animated, ScrollView, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBoxeoTimer } from '../hooks/useBoxeoTimer';
-import { Text, IconButton, Surface } from 'react-native-paper';
+import { Text, IconButton } from 'react-native-paper';
 import { useWorkoutStore } from '@/features/workouts/store/useWorkoutStore';
 import { useUserStore } from '@/features/profile/store/userStore';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Speech from 'expo-speech';
 import { useRouter } from 'expo-router';
-import { useAudioPlayer, AudioSource } from 'expo-audio';
-import { formatTime, calculateTotalWorkoutTime } from '@/utils/timeUtils';
+import { formatTime } from '@/utils/timeUtils';
 import { PhaseBadge, IntensityBar, ExerciseCard, BlurHeader } from '@/components/timer';
+
+// New hooks
+import { useTimerStateMachine } from '../hooks/useTimerStateMachine';
+import { usePhaseTimer } from '../hooks/usePhaseTimer';
+import { useAudioManager } from '../hooks/useAudioManager';
+
+// Shared components
+import {
+    TimerDisplay,
+    TimerControls,
+} from './shared';
 
 interface TimerBoxeoProps {
     sessionId?: string;
@@ -24,340 +31,123 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
     sessionId = 'default',
     onTimeUpdate,
     workout: workoutProp,
-    onComplete
+    onComplete,
 }) => {
     const { currentWorkout: storeWorkout } = useWorkoutStore();
     const { userData } = useUserStore();
+    const router = useRouter();
 
-    // Usar el workout pasado como prop, o el del store como fallback
+    // Use workout from props or store
     const currentWorkout = workoutProp || storeWorkout;
-
-    const [phase, setPhase] = useState<'warmup' | 'workout' | 'cooldown' | 'finished'>('warmup');
 
     const warmup = (currentWorkout as any)?.warmup || [];
     const cooldown = (currentWorkout as any)?.cooldown || [];
 
-    const workoutRounds = currentWorkout && 'rounds' in currentWorkout ? (currentWorkout as any).rounds.map((r: any) => ({
-        roundNumber: r.roundNumber,
-        workTime: r.workTime,
-        restTime: r.restTime,
-        exercises: r.exercises
-    })) : undefined;
+    // Map BoxingWorkout rounds to TimerConfig structure
+    const workoutRounds =
+        currentWorkout && 'rounds' in currentWorkout
+            ? (currentWorkout as any).rounds.map((r: any) => ({
+                roundNumber: r.roundNumber,
+                workTime: r.workTime,
+                restTime: r.restTime,
+                exercises: r.exercises,
+            }))
+            : undefined;
+
+    // 🔍 DEBUG: Log complete workout structure
+
+
+
+
+
+
 
     const prepMinutes = userData?.prepTimeMinutes || 0;
     const prepSeconds = userData?.prepTimeSeconds !== undefined ? userData.prepTimeSeconds : 10;
-    const prepTimeInSeconds = (prepMinutes * 60) + prepSeconds;
+    const prepTimeInSeconds = prepMinutes * 60 + prepSeconds;
 
-    const router = useRouter();
+    // State
     const [isSoundMuted, setIsSoundMuted] = useState(false);
     const [userHasStarted, setUserHasStarted] = useState(false);
+    const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
 
-    const timerConfig = useMemo(() => ({
-        roundDuration: (currentWorkout as any)?.roundDuration || 180,
-        restDuration: (currentWorkout as any)?.restDuration || 60,
-        totalRounds: (currentWorkout as any)?.rounds?.length || 12,
-        rounds: workoutRounds,
-        prepTime: prepTimeInSeconds,
-        timerSoundEnabled: userHasStarted && !isSoundMuted && (userData?.timerSoundEnabled !== false)
-    }), [currentWorkout, workoutRounds, prepTimeInSeconds, isSoundMuted, userData?.timerSoundEnabled, userHasStarted]);
+    // State machine for phase management
+    const {
+        phase,
+        transitionTo,
+        reset: resetPhase,
+        isWarmup,
+        isWorkout,
+        isCooldown,
+        isFinished,
+    } = useTimerStateMachine('warmup');
 
+    // Boxing timer configuration
+    const timerConfig = useMemo(
+        () => ({
+            roundDuration: (currentWorkout as any)?.roundDuration || 180,
+            restDuration: (currentWorkout as any)?.restDuration || 60,
+            totalRounds: (currentWorkout as any)?.rounds?.length || 12,
+            rounds: workoutRounds,
+            prepTime: prepTimeInSeconds,
+            timerSoundEnabled: !isSoundMuted && userData?.timerSoundEnabled !== false,
+            voiceEnabled: userData?.voiceEnabled !== false,
+            onWorkoutComplete: () => {
+
+                handleFinishWorkout();
+            },
+        }),
+        [currentWorkout, workoutRounds, prepTimeInSeconds, isSoundMuted, userData]
+    );
+
+    // Boxing timer hook
     const { state, toggleTimer, resetTimer, skipToNextRound } = useBoxeoTimer(sessionId, timerConfig);
     const { timeLeft, round, isRest, isActive, isPreparing } = state;
 
-    // Force pause if timer tries to auto-start before user interaction
-    // This effect ensures strict compliance with "Wait for Play" rule
-    useEffect(() => {
-        if (!userHasStarted && isActive) {
-            toggleTimer();
-        }
-    }, [isActive, userHasStarted]);
+    // Debug: Check totalRounds
+    console.log('🔍 [ROUNDS] Debug:', {
+        'state.totalRounds': state.totalRounds,
+        'timerConfig.totalRounds': timerConfig.totalRounds,
+        'workoutRounds.length': workoutRounds?.length,
+        'currentWorkout.rounds.length': (currentWorkout as any)?.rounds?.length,
+    });
 
-    // Efecto para el temporizador de warmup/cooldown
-    useLayoutEffect(() => {
-        let interval: NodeJS.Timeout;
+    // Audio manager (separate from boxing timer for warmup/cooldown)
+    const audio = useAudioManager({
+        voiceEnabled: userData?.voiceEnabled !== false,
+        timerSoundEnabled: !isSoundMuted && userData?.timerSoundEnabled !== false,
+    });
 
-        console.log('⏱️ [TIMER] Effect running', {
-            isPhaseActive,
-            phaseTimeLeft,
-            isPreparing,
-            userHasStarted,
-            phase,
-            willStart: isPhaseActive && phaseTimeLeft > 0 && !isPreparing && userHasStarted
-        });
+    // Phase timer for warmup/cooldown
+    const [warmupIndex, setWarmupIndex] = useState(0);
+    const [cooldownIndex, setCooldownIndex] = useState(0);
 
-        // Strict condition: Only run if active, time remains, NOT preparing, and user explicitly started
-        if (isPhaseActive && phaseTimeLeft > 0 && !isPreparing && userHasStarted) {
-            console.log('⏱️ [TIMER] Starting interval - timer is now counting down');
-            interval = setInterval(() => {
-                setPhaseTimeLeft((prev) => {
-                    if (prev <= 1) {
-                        // Handle phase transition when time reaches 0
-                        if (phase === 'warmup' && warmupIndex < warmup.length - 1) {
-                            setWarmupIndex(prev => prev + 1);
-                            speakIfEnabled(warmup[warmupIndex + 1]?.name, { language: 'es-ES' });
-                            return warmup[warmupIndex + 1]?.duration || 0;
-                        } else if (phase === 'cooldown' && cooldownIndex < cooldown.length - 1) {
-                            setCooldownIndex(prev => prev + 1);
-                            speakIfEnabled(cooldown[cooldownIndex + 1]?.name, { language: 'es-ES' });
-                            return cooldown[cooldownIndex + 1]?.duration || 0;
-                        } else {
-                            // Last exercise finished, transition to next phase
-                            console.log('⏱️ [TIMER] Setting isPhaseActive to false - exercise finished');
-                            setIsPhaseActive(false);
-                            if (phase === 'warmup') {
-                                handleStartWorkout();
-                            } else if (phase === 'cooldown') {
-                                handleFinishCooldown();
-                            }
-                            return 0;
-                        }
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        } else {
-            console.log('⏱️ [TIMER] NOT starting interval - conditions not met');
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [isPhaseActive, phaseTimeLeft, isPreparing, userHasStarted, phase, warmupIndex, warmup, cooldownIndex, cooldown]);
-
-    // Efecto para el sonido de tic-tac en fases locales (warmup/cooldown)
-    useEffect(() => {
-        const isInPhase = phase === 'warmup' || phase === 'cooldown';
-
-        console.log('🔊 [SOUND] Effect running', {
-            isPhaseActive,
-            isInPhase,
-            phaseTimeLeft,
-            isPreparing,
-            userHasStarted,
-            isSoundMuted,
-            timerSoundEnabled: userData?.timerSoundEnabled,
-            willPlay: isPhaseActive && isInPhase && phaseTimeLeft > 0 && !isPreparing && userHasStarted && !isSoundMuted && (userData?.timerSoundEnabled !== false)
-        });
-
-        // Strict audio condition: Only play if phase is active, in warmup/cooldown, time remains, NOT preparing, and user started
-        if (isPhaseActive && isInPhase && phaseTimeLeft > 0 && !isPreparing && userHasStarted && !isSoundMuted && (userData?.timerSoundEnabled !== false)) {
-            console.log('🔊 [SOUND] Attempting to play tick-tack sound');
-            try {
-                if (phaseTickPlayer && !phaseTickPlayer.playing) {
-                    phaseTickPlayer.loop = true;
-                    phaseTickPlayer.play();
-                    console.log('🔊 [SOUND] Tick-tack sound started');
-                } else {
-                    console.log('🔊 [SOUND] Tick-tack already playing');
-                }
-            } catch (error) {
-                console.error('Error playing phase tick sound:', error);
+    const phaseTimer = usePhaseTimer({
+        initialTime: 0,
+        autoStart: false,
+        onTick: (timeLeft) => {
+            if (timeLeft <= 3 && timeLeft > 0) {
+                audio.speakCountdown(timeLeft);
             }
-        } else {
-            console.log('🔊 [SOUND] Pausing tick-tack sound (conditions not met)');
-            try {
-                if (phaseTickPlayer && phaseTickPlayer.playing) {
-                    phaseTickPlayer.pause();
-                    console.log('🔊 [SOUND] Tick-tack sound paused');
-                }
-            } catch (error) {
-                console.error('Error pausing phase tick sound:', error);
-            }
-        }
+        },
+        onComplete: () => {
+            handlePhaseComplete();
+        },
+    });
 
-        return () => {
-            try {
-                if (phaseTickPlayer && phaseTickPlayer.playing) {
-                    phaseTickPlayer.pause();
-                }
-            } catch (error) {
-                // Silently ignore cleanup errors
-            }
-        };
-    }, [isPhaseActive, phase, phaseTimeLeft, isSoundMuted, userData?.timerSoundEnabled, isPreparing, userHasStarted]);
+    // Animations
+    const fadeAnim = useRef(new Animated.Value(1)).current;
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+    const prevIsPreparing = useRef(true);
 
-    const handlePlayPress = () => {
-        if (!userHasStarted) {
-            setUserHasStarted(true);
-        }
-
-        if (isPreparing) {
-            toggleTimer();
-        } else {
-            handleTogglePhase();
-        }
-    };
-
-
-
+    // Current round info
     const currentRoundInfo = workoutRounds?.[round - 1];
     const exercises = currentRoundInfo?.exercises || [
         { name: 'JAB - CROSS - HOOK', description: 'Gira el pie delantero al lanzar el Hook.', duration: 60 },
     ];
+    const currentExercise = exercises[currentExerciseIndex];
 
-    const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-    const hasSpokenExerciseCountdownRef = useRef<Set<string>>(new Set());
-    const fadeAnim = useRef(new Animated.Value(1)).current;
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-    const prevIsPreparing = useRef(true);
-
-    // Estados para warmup/cooldown
-    const [warmupIndex, setWarmupIndex] = useState(0);
-    const [cooldownIndex, setCooldownIndex] = useState(0);
-    const [phaseTimeLeft, setPhaseTimeLeft] = useState(0);
-    const [isPhaseActive, setIsPhaseActive] = useState(false);
-
-    // Audio player para tick-tack en warmup/cooldown
-    const phaseTickPlayer = useAudioPlayer(require('../../../../assets/tictac.mp3') as AudioSource);
-
-
-    // Usar el tiempo total del workout generado por la IA (viene en minutos)
-    const totalWorkoutTime = useMemo(() => {
-        // Si el workout tiene totalDuration, usarlo (está en minutos, convertir a segundos)
-        if (currentWorkout?.totalDuration) {
-            return currentWorkout.totalDuration * 60;
-        }
-
-        // Fallback: calcular manualmente
-        let total = 0;
-
-        // Warmup
-        warmup.forEach((w: any) => total += w.duration || 0);
-
-        // Rounds (work + rest)
-        if (workoutRounds) {
-            workoutRounds.forEach((r: any) => {
-                total += (r.workTime || 180) + (r.restTime || 60);
-            });
-        } else {
-            const roundDuration = (currentWorkout as any)?.roundDuration || 180;
-            const restDuration = (currentWorkout as any)?.restDuration || 60;
-            const totalRounds = state.totalRounds || 12;
-            total += (roundDuration + restDuration) * totalRounds;
-        }
-
-        // Cooldown
-        cooldown.forEach((c: any) => total += c.duration || 0);
-
-        return total;
-    }, [currentWorkout, warmup, cooldown, workoutRounds, state.totalRounds]);
-
-    ;
-    ;
-    ;
-
-    // Calcular tiempo restante total - método simplificado
-    const totalTimeRemaining = useMemo(() => {
-        let timeElapsed = 0;
-
-        // IMPORTANTE: Verificar primero si estamos en preparación, antes de verificar la fase
-        // Si estamos en preparación (del hook de boxeo)
-        if (isPreparing) {
-            // El tiempo restante es todo el workout + el tiempo de preparación restante
-            return totalWorkoutTime + timeLeft;
-        }
-
-        // Si estamos en WARMUP (fase del componente, no del hook)
-        if (phase === 'warmup') {
-            // Tiempo transcurrido del warmup
-            for (let i = 0; i < warmupIndex; i++) {
-                timeElapsed += warmup[i]?.duration || 0;
-            }
-            // Tiempo transcurrido del ejercicio actual de warmup
-            const currentExerciseDuration = warmup[warmupIndex]?.duration || 0;
-            timeElapsed += (currentExerciseDuration - phaseTimeLeft);
-
-            // El resto del workout aún no ha empezado
-            const remaining = totalWorkoutTime - timeElapsed;
-            return Math.max(0, remaining);
-        }
-
-        // Si estamos en COOLDOWN
-        if (phase === 'cooldown') {
-            // Ya completamos warmup y workout, solo falta cooldown
-
-            // Sumar todo el warmup
-            warmup.forEach((w: any) => timeElapsed += w.duration || 0);
-
-            // Sumar todos los rounds
-            if (workoutRounds) {
-                workoutRounds.forEach((r: any) => {
-                    timeElapsed += (r.workTime || 180) + (r.restTime || 60);
-                });
-            } else {
-                const roundDuration = (currentWorkout as any)?.roundDuration || 180;
-                const restDuration = (currentWorkout as any)?.restDuration || 60;
-                const totalRounds = state.totalRounds || 12;
-                timeElapsed += (roundDuration + restDuration) * totalRounds;
-            }
-
-            // Sumar cooldown completado
-            for (let i = 0; i < cooldownIndex; i++) {
-                timeElapsed += cooldown[i]?.duration || 0;
-            }
-            // Tiempo transcurrido del ejercicio actual de cooldown
-            const currentCooldownDuration = cooldown[cooldownIndex]?.duration || 0;
-            timeElapsed += (currentCooldownDuration - phaseTimeLeft);
-
-            const remaining = totalWorkoutTime - timeElapsed;
-            return Math.max(0, remaining);
-        }
-
-        // Si estamos en WORKOUT (fase principal)
-        // Necesitamos incluir el tiempo del warmup que ya pasó
-
-        // Sumar todo el warmup que ya completamos
-        warmup.forEach((w: any) => timeElapsed += w.duration || 0);
-
-        // Calcular tiempo transcurrido de rounds completados
-        if (workoutRounds) {
-            // Rounds completados
-            for (let i = 0; i < round - 1; i++) {
-                const r = workoutRounds[i];
-                timeElapsed += (r.workTime || 180) + (r.restTime || 60);
-            }
-
-            // Round actual
-            if (round <= workoutRounds.length) {
-                const currentRoundData = workoutRounds[round - 1];
-                const roundWorkTime = currentRoundData?.workTime || 180;
-                const roundRestTime = currentRoundData?.restTime || 60;
-
-                if (isRest) {
-                    // Ya completamos el trabajo, estamos en descanso
-                    timeElapsed += roundWorkTime;
-                    timeElapsed += (roundRestTime - timeLeft); // Tiempo transcurrido del descanso
-                } else {
-                    // Estamos en trabajo
-                    timeElapsed += (roundWorkTime - timeLeft); // Tiempo transcurrido del trabajo
-                }
-            }
-        } else {
-            // Fallback para workouts sin estructura de rounds
-            const roundDuration = (currentWorkout as any)?.roundDuration || 180;
-            const restDuration = (currentWorkout as any)?.restDuration || 60;
-
-            // Rounds completados
-            timeElapsed += (round - 1) * (roundDuration + restDuration);
-
-            // Round actual
-            if (isRest) {
-                timeElapsed += roundDuration;
-                timeElapsed += (restDuration - timeLeft);
-            } else {
-                timeElapsed += (roundDuration - timeLeft);
-            }
-        }
-
-        // Tiempo restante = tiempo total - tiempo transcurrido
-        const remaining = totalWorkoutTime - timeElapsed;
-        return Math.max(0, remaining); // No puede ser negativo
-    }, [phase, warmupIndex, warmup, cooldownIndex, cooldown, phaseTimeLeft, totalWorkoutTime, timeLeft, isPreparing, isRest, round, workoutRounds, currentWorkout, state.totalRounds]);
-
-    ;
-
-    // Calcular ejercicio actual
+    // Calculate current exercise based on time
     useEffect(() => {
         if (!isPreparing && !isRest && isActive && exercises.length > 0) {
             const roundDuration = currentRoundInfo?.workTime || 180;
@@ -396,7 +186,56 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
         }
     }, [timeLeft, isPreparing, isRest, isActive, exercises, currentRoundInfo]);
 
-    // Efecto de pulso para el timer
+    // Ref to track spoken countdowns
+    const hasSpokenExerciseCountdownRef = useRef<Set<string>>(new Set());
+    const lastAnnouncedExerciseRef = useRef<string>('');
+
+    // Announce exercise name when it changes (only during workout, not warmup/cooldown)
+    useEffect(() => {
+        if (isWorkout && !isPreparing && !isRest && isActive && exercises[currentExerciseIndex]) {
+            const currentExercise = exercises[currentExerciseIndex];
+            const exerciseKey = `${round}-${currentExerciseIndex}`;
+
+            // Only announce if we haven't announced this exercise yet
+            if (lastAnnouncedExerciseRef.current !== exerciseKey) {
+                lastAnnouncedExerciseRef.current = exerciseKey;
+                audio.announceExercise(currentExercise.name);
+            }
+        }
+    }, [currentExerciseIndex, isPreparing, isRest, isActive, isWorkout, round, exercises, audio]);
+
+    // Countdown 3-2-1 before changing to next exercise (only during workout)
+    useEffect(() => {
+        if (isWorkout && !isPreparing && !isRest && isActive && exercises.length > 1) {
+            const roundDuration = currentRoundInfo?.workTime || 180;
+            const timeElapsed = roundDuration - timeLeft;
+
+            // Calculate time until next exercise
+            let accumulatedTime = 0;
+            for (let i = 0; i <= currentExerciseIndex; i++) {
+                accumulatedTime += exercises[i].duration || 30;
+            }
+
+            const timeUntilNextExercise = accumulatedTime - timeElapsed;
+
+            // If 3, 2, or 1 seconds until next exercise (and not the last one)
+            if (timeUntilNextExercise <= 3 && timeUntilNextExercise > 0 && currentExerciseIndex < exercises.length - 1) {
+                const countdownKey = `${round}-${currentExerciseIndex}-${Math.floor(timeUntilNextExercise)}`;
+
+                if (!hasSpokenExerciseCountdownRef.current.has(countdownKey)) {
+                    hasSpokenExerciseCountdownRef.current.add(countdownKey);
+                    audio.speakCountdown(Math.floor(timeUntilNextExercise));
+                }
+            }
+
+            // Clear the set when moving away from countdown zone
+            if (timeUntilNextExercise > 3) {
+                hasSpokenExerciseCountdownRef.current.clear();
+            }
+        }
+    }, [timeLeft, isPreparing, isRest, isActive, isWorkout, currentExerciseIndex, exercises, round, currentRoundInfo, audio]);
+
+    // Pulse animation
     useEffect(() => {
         const pulseAnimation = Animated.loop(
             Animated.sequence([
@@ -423,227 +262,176 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
         return () => pulseAnimation.stop();
     }, [isActive, isPreparing, scaleAnim]);
 
-    // Reset exercise index cuando cambia el round
-    // Intercept finish of "Preparation" to start "Warmup"
+    // Handle preparation finish -> warmup
     useEffect(() => {
-        if (prevIsPreparing.current && !isPreparing) {
-            console.log('🎯 [PREP_FINISH] Preparation finished, transitioning to warmup', {
-                phase,
-                isActive,
-                userHasStarted,
-                warmupLength: warmup.length
-            });
+        // Only handle if we were preparing and now we're not, AND we're still in warmup phase
+        if (prevIsPreparing.current && !isPreparing && isWarmup) {
+            if (warmup.length > 0) {
+                // Pause boxing timer and start warmup
 
-            // Hook just finished preparation phase.
-            // If we have a warmup, we should PAUSE the timer (which is now in Round 1)
-            // and start our local warmup phase.
-            if (phase === 'warmup') {
-                if (warmup.length > 0) {
-                    console.log('🎯 [PREP_FINISH] Initializing warmup');
-
-                    // Initialize warmup and auto-start it
-                    const warmupDuration = warmup[0].duration;
-                    console.log('🎯 [PREP_FINISH] Setting states - phaseTimeLeft:', warmupDuration, 'isPhaseActive: true');
-
-                    // Set both states together
-                    setPhaseTimeLeft(warmupDuration);
-                    setIsPhaseActive(true);
-
-                    // Pause the hook timer AFTER setting states
-                    if (isActive) {
-                        console.log('🎯 [PREP_FINISH] Pausing hook timer');
-                        toggleTimer();
-                    }
-
-                    speakIfEnabled(warmup[0].name, { language: 'es-ES' });
-                } else {
-                    console.log('🎯 [PREP_FINISH] No warmup, transitioning to workout');
-                    // No warmup, transition directly to workout
-                    // The hook is already running Round 1, so we just update the phase
-                    setPhase('workout');
+                if (isActive) {
+                    toggleTimer();
                 }
+                phaseTimer.setTime(warmup[0].duration);
+                phaseTimer.start();
+                audio.announceExercise(warmup[0].name);
+            } else {
+                // No warmup, go to workout - keep timer running!
+
+                transitionTo('workout');
             }
         }
         prevIsPreparing.current = isPreparing;
-    }, [isPreparing, isActive, phase, warmup, userHasStarted]);
+    }, [isPreparing, isActive, isWarmup, warmup]);
 
+    // Tick sound management - play during warmup and workout, stop during preparation and cooldown
+    useEffect(() => {
+        const shouldPlayTickSound = (isWarmup && phaseTimer.isActive) || (isWorkout && isActive && !isPreparing && !isRest);
+
+        console.log('🎵 [TICK_SOUND] Phase-based control', {
+            phase,
+            isWarmup,
+            isWorkout,
+            phaseTimerActive: phaseTimer.isActive,
+            boxingTimerActive: isActive,
+            isPreparing,
+            isRest,
+            shouldPlay: shouldPlayTickSound,
+        });
+
+        if (shouldPlayTickSound) {
+
+            audio.startTickSound();
+        } else {
+
+            audio.stopTickSound();
+        }
+
+        return () => {
+            audio.stopTickSound();
+        };
+    }, [isWarmup, isWorkout, phaseTimer.isActive, isActive, isPreparing, isRest, audio]);
+
+    // Reset exercise index on round change
     useEffect(() => {
         setCurrentExerciseIndex(0);
         fadeAnim.setValue(1);
         hasSpokenExerciseCountdownRef.current.clear();
     }, [round, isPreparing, isRest]);
 
-    // Debug effect to track state changes
-    useEffect(() => {
-        console.log('📍 [STATE_CHANGE] isPhaseActive or phaseTimeLeft changed', {
-            isPhaseActive,
-            phaseTimeLeft,
-            phase,
-            isPreparing,
-            userHasStarted
-        });
-    }, [isPhaseActive, phaseTimeLeft]);
+    // Calculate total time remaining
+    const totalTimeRemaining = useMemo(() => {
+        const totalWorkoutTime = (currentWorkout?.totalDuration || 30) * 60;
 
-    const speakIfEnabled = (text: string, options?: any) => {
-        if (userData?.voiceEnabled !== false) {
-            Speech.speak(text, options);
-        }
-    };
-
-
-
-
-    const handleTogglePhase = () => {
-        setIsPhaseActive(!isPhaseActive);
-    };
-
-
-
-    const handleSkipPhaseExercise = () => {
-        if (phase === 'warmup' && warmupIndex < warmup.length - 1) {
-            setWarmupIndex(prev => prev + 1);
-            setPhaseTimeLeft(warmup[warmupIndex + 1]?.duration || 0);
-            speakIfEnabled(warmup[warmupIndex + 1]?.name, { language: 'es-ES' });
-        } else if (phase === 'cooldown' && cooldownIndex < cooldown.length - 1) {
-            setCooldownIndex(prev => prev + 1);
-            setPhaseTimeLeft(cooldown[cooldownIndex + 1]?.duration || 0);
-            speakIfEnabled(cooldown[cooldownIndex + 1]?.name, { language: 'es-ES' });
-        }
-    };
-
-    const handleStartWorkout = () => {
-        console.log('🏋️ [WORKOUT_START] handleStartWorkout called - setting isPhaseActive to false');
-        setPhase('workout');
-        setIsPhaseActive(false);
-        speakIfEnabled('Comienza el entrenamiento', { language: 'es-ES' });
-        // Resume global timer (Round 1) if it was paused
-        if (!isActive) {
-            toggleTimer();
-        }
-    };
-
-    const handleFinishWorkout = () => {
-        setPhase('cooldown');
-        if (cooldown.length > 0) {
-            setCooldownIndex(0);
-            setPhaseTimeLeft(cooldown[0].duration);
-            // Don't auto-start cooldown - user must press play
-            speakIfEnabled(`Comienza enfriamiento: ${cooldown[0].name}`, { language: 'es-ES' });
-        }
-    };
-
-    const handleFinishCooldown = () => {
-        setPhase('finished');
-        setIsPhaseActive(false);
-        speakIfEnabled('Entrenamiento finalizado, excelente trabajo', { language: 'es-ES' });
-    };
-
-    // Funciones para skip en WARMUP y COOLDOWN
-    const handleSkipExercise = () => {
-        console.log('⏭️ [SKIP] Called handleSkipExercise', {
-            isPreparing,
-            phase,
-            userHasStarted,
-            isPhaseActive,
-            warmupIndex,
-            phaseTimeLeft
-        });
-
-        // IMPORTANTE: Verificar primero si estamos en preparación antes de las fases locales
         if (isPreparing) {
-            console.log('⏭️ [SKIP] In preparation, setting userHasStarted and calling skipToNextRound');
-            // Marcar que el usuario ha iniciado (para que el timer y sonido funcionen)
+            return totalWorkoutTime + timeLeft;
+        }
+
+        if (isWarmup) {
+            const warmupCompleted = warmup.slice(0, warmupIndex).reduce((sum: number, w: any) => sum + w.duration, 0);
+            const currentWarmupElapsed = (warmup[warmupIndex]?.duration || 0) - phaseTimer.timeLeft;
+            return totalWorkoutTime - warmupCompleted - currentWarmupElapsed;
+        }
+
+        if (isCooldown) {
+            const currentCooldownElapsed = (cooldown[cooldownIndex]?.duration || 0) - phaseTimer.timeLeft;
+            const cooldownRemaining = cooldown.slice(cooldownIndex).reduce((sum: number, c: any) => sum + c.duration, 0) - currentCooldownElapsed;
+            return cooldownRemaining;
+        }
+
+        // Workout phase - subtract warmup time already spent
+        const totalWarmupTime = warmup.reduce((sum: number, w: any) => sum + w.duration, 0);
+        const roundsCompleted = (round - 1) * ((currentRoundInfo?.workTime || 180) + (currentRoundInfo?.restTime || 60));
+        const currentRoundElapsed = isRest
+            ? (currentRoundInfo?.workTime || 180) + ((currentRoundInfo?.restTime || 60) - timeLeft)
+            : (currentRoundInfo?.workTime || 180) - timeLeft;
+
+        return totalWorkoutTime - totalWarmupTime - roundsCompleted - currentRoundElapsed;
+    }, [phase, isPreparing, isRest, round, timeLeft, warmupIndex, cooldownIndex, phaseTimer.timeLeft, currentWorkout, warmup, cooldown, currentRoundInfo, isWarmup, isCooldown]);
+
+    // Handlers
+    const handlePhaseComplete = () => {
+        if (isWarmup) {
+            if (warmupIndex < warmup.length - 1) {
+                setWarmupIndex(warmupIndex + 1);
+                phaseTimer.setTime(warmup[warmupIndex + 1].duration);
+                audio.announceExercise(warmup[warmupIndex + 1].name);
+            } else {
+                // Warmup complete, start workout
+                transitionTo('workout');
+                phaseTimer.pause();
+                if (!isActive) {
+                    toggleTimer();
+                }
+            }
+        } else if (isCooldown) {
+            if (cooldownIndex < cooldown.length - 1) {
+                setCooldownIndex(cooldownIndex + 1);
+                phaseTimer.setTime(cooldown[cooldownIndex + 1].duration);
+                audio.announceExercise(cooldown[cooldownIndex + 1].name);
+            } else {
+                // Cooldown complete
+                transitionTo('finished');
+                phaseTimer.pause();
+                onComplete?.();
+            }
+        }
+    };
+
+    const handlePlayPress = () => {
+        if (!userHasStarted) {
+            setUserHasStarted(true);
+        }
+
+        if (isPreparing || isWorkout) {
+            toggleTimer();
+        } else {
+            phaseTimer.toggle();
+        }
+    };
+
+    const handleSkipExercise = () => {
+        if (isPreparing) {
             if (!userHasStarted) {
                 setUserHasStarted(true);
-                console.log('⏭️ [SKIP] Set userHasStarted to TRUE');
             }
-            // Saltar la preparación usando la función del hook
             skipToNextRound();
-            return;
-        }
-
-        if (phase === 'warmup') {
+        } else if (isWarmup) {
             if (warmupIndex < warmup.length - 1) {
-                console.log('⏭️ [SKIP] Skipping to next warmup exercise', warmupIndex + 1);
-                // Ir al siguiente ejercicio de warmup
                 setWarmupIndex(warmupIndex + 1);
-                setPhaseTimeLeft(warmup[warmupIndex + 1]?.duration || 0);
-                ;
+                phaseTimer.setTime(warmup[warmupIndex + 1].duration);
             } else {
-                console.log('⏭️ [SKIP] Warmup finished, moving to workout');
-                // Terminar warmup e ir a workout
-                setPhase('workout');
-                ;
+                transitionTo('workout');
+                phaseTimer.pause();
             }
-        } else if (phase === 'cooldown') {
+        } else if (isCooldown) {
             if (cooldownIndex < cooldown.length - 1) {
-                console.log('⏭️ [SKIP] Skipping to next cooldown exercise', cooldownIndex + 1);
-                // Ir al siguiente ejercicio de cooldown
                 setCooldownIndex(cooldownIndex + 1);
-                setPhaseTimeLeft(cooldown[cooldownIndex + 1]?.duration || 0);
-                ;
+                phaseTimer.setTime(cooldown[cooldownIndex + 1].duration);
             } else {
-                console.log('⏭️ [SKIP] Cooldown finished, moving to finished');
-                // Terminar cooldown
-                setPhase('finished');
-                setIsPhaseActive(false);
-                ;
+                transitionTo('finished');
+                phaseTimer.pause();
             }
-        } else if (phase === 'workout') {
-            console.log('⏭️ [SKIP] In workout, calling skipToNextRound');
-            // Usar la función del hook de boxeo
-            skipToNextRound();
+        } else if (isWorkout) {
+            // Check if we're in the last round's rest period
+            if (isRest && round >= state.totalRounds) {
+
+                handleFinishWorkout();
+            } else {
+                skipToNextRound();
+            }
         }
     };
-
-    const handlePreviousExercise = () => {
-        if (phase === 'warmup') {
-            if (warmupIndex > 0) {
-                // Ir al ejercicio anterior de warmup
-                setWarmupIndex(warmupIndex - 1);
-                setPhaseTimeLeft(warmup[warmupIndex - 1]?.duration || 0);
-                ;
-            }
-        } else if (phase === 'cooldown') {
-            if (cooldownIndex > 0) {
-                // Ir al ejercicio anterior de cooldown
-                setCooldownIndex(cooldownIndex - 1);
-                setPhaseTimeLeft(cooldown[cooldownIndex - 1]?.duration || 0);
-                ;
-            } else {
-                // Volver a workout
-                setPhase('workout');
-                ;
-            }
-        } else if (phase === 'workout') {
-            // En workout, volver al warmup si estamos en el primer round
-            if (round === 1 && !isRest) {
-                setPhase('warmup');
-                setWarmupIndex(warmup.length - 1);
-                setPhaseTimeLeft(warmup[warmup.length - 1]?.duration || 0);
-                ;
-            }
-            // Si no, no hacer nada (o podrías implementar lógica para volver al round anterior)
-        }
-    };
-
 
     const handleResetRoutine = () => {
-        console.log('🔄 [RESET] Resetting routine');
-        setPhase('warmup');
+        resetPhase();
+        resetTimer();
+        phaseTimer.reset();
         setWarmupIndex(0);
         setCooldownIndex(0);
-        setPhaseTimeLeft(0);
-        setIsPhaseActive(false);
-        setUserHasStarted(false); // Reset user interaction state
-        setCurrentExerciseIndex(0); // Reset exercise index
-        resetTimer(); // Reset hook state (isPreparing, round, etc.)
-        console.log('🔄 [RESET] All states reset', {
-            phase: 'warmup',
-            warmupIndex: 0,
-            isPhaseActive: false,
-            userHasStarted: false
-        });
+        setUserHasStarted(false);
+        setCurrentExerciseIndex(0);
+        transitionTo('warmup');
     };
 
     const handleBack = () => {
@@ -654,27 +442,44 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
         setIsSoundMuted(!isSoundMuted);
     };
 
+    const handleStartWorkout = () => {
+        transitionTo('workout');
+        phaseTimer.pause();
+        if (!isActive) {
+            toggleTimer();
+        }
+    };
 
-    // Colores según la fase
+    const handleFinishWorkout = () => {
+        transitionTo('cooldown');
+        if (isActive) {
+            toggleTimer();
+        }
+        if (cooldown.length > 0) {
+            setCooldownIndex(0);
+            phaseTimer.setTime(cooldown[0].duration);
+            audio.announceExercise(`Comienza enfriamiento: ${cooldown[0].name}`);
+        }
+    };
+
+    // Phase colors
     const phaseColors = isPreparing
         ? { primary: '#ff8c00', gradient: ['#ff8c00', '#f59e0b'] as [string, string], bg: '#221010' }
         : isRest
             ? { primary: '#2dd4bf', gradient: ['#2dd4bf', '#0891b2'] as [string, string], bg: '#0f172a' }
             : { primary: '#ec1313', gradient: ['#ec1313', '#dc2626'] as [string, string], bg: '#221010' };
 
-    const currentExercise = exercises[currentExerciseIndex];
-
-    // WARMUP PHASE - Mostrar isPreparing antes del warmup
-    if (phase === 'warmup' && (isPreparing || warmup.length > 0)) {
+    // WARMUP PHASE
+    if (isWarmup && (isPreparing || warmup.length > 0)) {
         const currentWarmupExercise = warmup[warmupIndex];
-        const displayTime = isPreparing ? timeLeft : phaseTimeLeft || warmup[0]?.duration || 300;
-        const displayTitle = isPreparing ? "PREPÁRATE" : (currentWarmupExercise?.name || 'Calentamiento').toUpperCase();
+        const displayTime = isPreparing ? timeLeft : phaseTimer.timeLeft || warmup[0]?.duration || 300;
+        const displayTitle = isPreparing ? 'PREPÁRATE' : (currentWarmupExercise?.name || 'Calentamiento').toUpperCase();
 
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: phaseColors.bg }]} edges={['top', 'left', 'right']}>
                 <StatusBar hidden />
                 <BlurHeader
-                    subtitle={isPreparing ? "Preparación" : "Calentamiento"}
+                    subtitle={isPreparing ? 'Preparación' : 'Calentamiento'}
                     onBack={handleBack}
                     onMuteToggle={handleMuteToggle}
                     isMuted={isSoundMuted}
@@ -696,19 +501,17 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                         )}
                     </View>
 
-                    {/* Timer grande */}
                     <View style={styles.timerSection}>
-
-                        <Animated.Text style={[styles.timerLarge, { color: phaseColors.primary, transform: [{ scale: scaleAnim }] }]}>
-                            {formatTime(displayTime)}
-                        </Animated.Text>
-                        <View style={styles.timerLabel}>
-                            <MaterialCommunityIcons name="timer-outline" size={16} color="rgba(255, 255, 255, 0.6)" />
-                            <Text style={styles.timerLabelText}>{isPreparing ? 'Comienza en' : 'Tiempo de calentamiento'}</Text>
-                        </View>
+                        <TimerDisplay
+                            timeLeft={displayTime}
+                            label={isPreparing ? 'Comienza en' : 'Tiempo de calentamiento'}
+                            color={phaseColors.primary}
+                            size="large"
+                            animated={true}
+                            scaleAnim={scaleAnim}
+                        />
                     </View>
 
-                    {/* Content */}
                     {isPreparing ? (
                         <View style={styles.messageContainer}>
                             <Text style={styles.messageText}>El calentamiento comenzará pronto</Text>
@@ -720,7 +523,7 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                                 description={currentWarmupExercise?.description || 'Prepara tu cuerpo para el entrenamiento'}
                                 currentStep="Ejercicio Actual"
                                 colors={['#ff8c00', '#f97316']}
-                                animated={isPhaseActive}
+                                animated={phaseTimer.isActive}
                             />
 
                             <View style={styles.nextExercise}>
@@ -733,32 +536,23 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                     )}
                 </ScrollView>
 
-                {/* Controls */}
                 <View style={styles.controlsContainer}>
-                    <View style={styles.controlButtons}>
-                        <Pressable style={styles.skipButton} onPress={handleResetRoutine}>
-                            <MaterialCommunityIcons name="restart" size={28} color="#ffffff" />
-                        </Pressable>
-                        <Pressable style={styles.skipButton} onPress={handlePreviousExercise} disabled={isPreparing}>
-                            <MaterialCommunityIcons name="skip-previous" size={28} color={isPreparing ? "rgba(255,255,255,0.2)" : "#ffffff"} />
-                        </Pressable>
-                        <Pressable
-                            style={[styles.playButton, { backgroundColor: isPreparing ? phaseColors.primary : '#ec1313' }]}
-                            onPress={handlePlayPress}
-                        >
-                            <MaterialCommunityIcons name={(isPreparing ? isActive : isPhaseActive) ? "pause" : "play"} size={42} color="#ffffff" />
-                        </Pressable>
-                        <Pressable style={styles.skipButton} onPress={handleSkipExercise} disabled={false}>
-                            <MaterialCommunityIcons name="skip-next" size={28} color="#ffffff" />
-                        </Pressable>
-                    </View>
+                    <TimerControls
+                        isPlaying={isPreparing ? isActive : phaseTimer.isActive}
+                        onPlayPause={handlePlayPress}
+                        onSkip={handleSkipExercise}
+                        onReset={handleResetRoutine}
+                        playButtonColor={isPreparing ? phaseColors.primary : '#ec1313'}
+                    />
                 </View>
             </SafeAreaView>
         );
     }
 
     // COOLDOWN PHASE
-    if (phase === 'cooldown' && cooldown.length > 0) {
+    if (isCooldown && cooldown.length > 0) {
+        const currentCooldownExercise = cooldown[cooldownIndex];
+
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: '#0f172a' }]} edges={['top', 'left', 'right']}>
                 <StatusBar hidden />
@@ -784,56 +578,56 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                     </View>
 
                     <View style={styles.timerSection}>
-
-                        <Animated.Text style={[styles.timerLarge, { transform: [{ scale: scaleAnim }] }]}>
-                            {formatTime(phaseTimeLeft || cooldown[0]?.duration || 45)}
-                        </Animated.Text>
-                        <View style={styles.timerLabel}>
-                            <MaterialCommunityIcons name="timer-outline" size={16} color="rgba(255, 255, 255, 0.6)" />
-                            <Text style={styles.timerLabelText}>Tiempo Restante</Text>
-                        </View>
+                        <TimerDisplay
+                            timeLeft={phaseTimer.timeLeft}
+                            label="Tiempo Restante"
+                            color="#2dd4bf"
+                            size="large"
+                            animated={true}
+                            scaleAnim={scaleAnim}
+                        />
                     </View>
 
-                    <ExerciseCard
-                        title="HOMBRO - DERECHO"
-                        description="Cruza el brazo sobre el pecho y presiona suavemente hacia ti. Respira profundo."
-                        currentStep="Estiramiento Actual"
-                        colors={['#2dd4bf', '#0891b2']}
-                        totalSteps={3}
-                        currentStepIndex={1}
-                        animated={isPhaseActive}
-                    />
+                    {currentCooldownExercise && (
+                        <ExerciseCard
+                            title={currentCooldownExercise.name}
+                            description={currentCooldownExercise.description}
+                            currentStep="Estiramiento Actual"
+                            colors={['#2dd4bf', '#0891b2']}
+                            totalSteps={cooldown.length}
+                            currentStepIndex={cooldownIndex}
+                            animated={phaseTimer.isActive}
+                        />
+                    )}
 
                     <View style={styles.nextExercise}>
                         <Text style={[styles.nextLabel, { color: '#2dd4bf' }]}>Siguiente</Text>
-                        <Text style={styles.nextText}>Estiramiento de Hombro Izquierdo</Text>
+                        <Text style={styles.nextText}>
+                            {cooldown[cooldownIndex + 1]?.name || 'Finalizar'}
+                        </Text>
                     </View>
                 </ScrollView>
 
                 <View style={styles.controlsContainer}>
-                    <View style={styles.controlButtons}>
-                        <Pressable style={styles.skipButton} onPress={handleResetRoutine}>
-                            <MaterialCommunityIcons name="restart" size={28} color="#ffffff" />
-                        </Pressable>
-                        <Pressable style={styles.skipButton} onPress={handlePreviousExercise}>
-                            <MaterialCommunityIcons name="skip-previous" size={28} color="#ffffff" />
-                        </Pressable>
-                        <Pressable style={[styles.playButton, { backgroundColor: '#2dd4bf' }]} onPress={handleTogglePhase}>
-                            <MaterialCommunityIcons name={isPhaseActive ? "pause" : "play"} size={42} color="#ffffff" />
-                        </Pressable>
-                        <Pressable style={styles.skipButton} onPress={handleSkipExercise}>
-                            <MaterialCommunityIcons name="skip-next" size={28} color="#ffffff" />
-                        </Pressable>
-                    </View>
+                    <TimerControls
+                        isPlaying={phaseTimer.isActive}
+                        onPlayPause={() => phaseTimer.toggle()}
+                        onSkip={handleSkipExercise}
+                        onReset={handleResetRoutine}
+                        playButtonColor="#2dd4bf"
+                    />
                 </View>
             </SafeAreaView>
         );
     }
 
     // FINISHED PHASE
-    if (phase === 'finished') {
+    if (isFinished) {
         return (
-            <SafeAreaView style={[styles.container, { backgroundColor: '#221010', justifyContent: 'center', alignItems: 'center' }]} edges={['top', 'left', 'right']}>
+            <SafeAreaView
+                style={[styles.container, { backgroundColor: '#221010', justifyContent: 'center', alignItems: 'center' }]}
+                edges={['top', 'left', 'right']}
+            >
                 <StatusBar hidden />
                 <Text style={styles.finishedIcon}>🏆</Text>
                 <Text style={styles.finishedTitle}>¡Entrenamiento Completado!</Text>
@@ -842,7 +636,7 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                     icon="refresh"
                     iconColor="#ec1313"
                     size={32}
-                    onPress={() => setPhase('warmup')}
+                    onPress={handleResetRoutine}
                     style={styles.resetButton}
                 />
             </SafeAreaView>
@@ -891,24 +685,19 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                     </View>
                 </View>
 
-                {/* Timer grande */}
+                {/* Timer */}
                 <View style={styles.timerSection}>
-
-                    <Animated.Text
-                        style={[
-                            styles.timerLarge,
-                            { color: phaseColors.primary, transform: [{ scale: scaleAnim }] }
-                        ]}
-                    >
-                        {formatTime(timeLeft)}
-                    </Animated.Text>
-                    <View style={styles.timerLabel}>
-                        <MaterialCommunityIcons name="timer-outline" size={16} color="rgba(255, 255, 255, 0.6)" />
-                        <Text style={styles.timerLabelText}>Tiempo Restante</Text>
-                    </View>
+                    <TimerDisplay
+                        timeLeft={timeLeft}
+                        label="Tiempo Restante"
+                        color={phaseColors.primary}
+                        size="large"
+                        animated={true}
+                        scaleAnim={scaleAnim}
+                    />
                 </View>
 
-                {/* Exercise card - solo mostrar durante trabajo */}
+                {/* Exercise card */}
                 {!isPreparing && !isRest && (
                     <Animated.View style={{ opacity: fadeAnim }}>
                         <ExerciseCard
@@ -919,6 +708,17 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                             currentStepIndex={currentExerciseIndex}
                             colors={phaseColors.gradient}
                             animated={isActive}
+                            combinationTimeLeft={(() => {
+                                const roundDuration = currentRoundInfo?.workTime || 180;
+                                const timeElapsed = roundDuration - timeLeft;
+                                let accumulatedTime = 0;
+                                for (let i = 0; i < currentExerciseIndex; i++) {
+                                    accumulatedTime += exercises[i].duration || 30;
+                                }
+                                const exerciseTimeElapsed = timeElapsed - accumulatedTime;
+                                const exerciseDuration = currentExercise.duration || 30;
+                                return Math.max(0, Math.ceil(exerciseDuration - exerciseTimeElapsed));
+                            })()}
                         />
                     </Animated.View>
                 )}
@@ -949,23 +749,13 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                     color={phaseColors.primary}
                 />
 
-                <View style={styles.controlButtons}>
-                    <Pressable style={styles.skipButton} onPress={handleResetRoutine}>
-                        <MaterialCommunityIcons name="restart" size={28} color="#ffffff" />
-                    </Pressable>
-                    <Pressable style={styles.skipButton} onPress={handlePreviousExercise}>
-                        <MaterialCommunityIcons name="skip-previous" size={28} color="#ffffff" />
-                    </Pressable>
-                    <Pressable
-                        style={[styles.playButton, { backgroundColor: phaseColors.primary }]}
-                        onPress={toggleTimer}
-                    >
-                        <MaterialCommunityIcons name={isActive ? "pause" : "play"} size={42} color="#ffffff" />
-                    </Pressable>
-                    <Pressable style={styles.skipButton} onPress={handleSkipExercise}>
-                        <MaterialCommunityIcons name="skip-next" size={28} color="#ffffff" />
-                    </Pressable>
-                </View>
+                <TimerControls
+                    isPlaying={isActive}
+                    onPlayPause={handlePlayPress}
+                    onSkip={handleSkipExercise}
+                    onReset={handleResetRoutine}
+                    playButtonColor={phaseColors.primary}
+                />
             </View>
         </SafeAreaView>
     );
@@ -977,207 +767,112 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingHorizontal: 16,
     },
     topTimeBadge: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: 9999,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        paddingVertical: 6,
+        borderRadius: 12,
     },
     topTimeText: {
         fontSize: 12,
         fontWeight: '700',
         color: '#ffffff',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     phaseHeader: {
         alignItems: 'center',
-        marginTop: 16,
-        marginBottom: 8,
+        paddingVertical: 24,
+        gap: 8,
     },
     phaseTitle: {
-        fontSize: 40,
+        fontSize: 28,
         fontWeight: '900',
         color: '#ffffff',
-        fontStyle: 'italic',
-        letterSpacing: -1,
-        textAlign: 'center'
+        letterSpacing: 1,
+        textTransform: 'uppercase',
     },
     phaseSubtitle: {
-        color: 'rgba(255, 255, 255, 0.3)',
-        fontSize: 24,
-        fontWeight: '700',
+        fontSize: 20,
+        fontWeight: '400',
+        color: 'rgba(255, 255, 255, 0.5)',
     },
     phaseBadgeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        marginTop: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderRadius: 20,
     },
     phaseDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#ec1313',
+        backgroundColor: '#ff8c00',
     },
     phaseBadgeText: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#ec1313',
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#ffffff',
         textTransform: 'uppercase',
-        letterSpacing: 1.5,
+        letterSpacing: 1,
     },
     timerSection: {
         alignItems: 'center',
         paddingVertical: 32,
-        position: 'relative',
-    },
-    timerGlow: {
-        position: 'absolute',
-        width: 300,
-        height: 300,
-        borderRadius: 9999,
-        backgroundColor: '#ec131315',
-    },
-    timerLarge: {
-        fontSize: 100,
-        fontWeight: '900',
-        color: '#ffffff',
-        lineHeight: 85,
-        letterSpacing: -4,
     },
     timerLabel: {
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: 9999,
-        marginTop: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+        marginTop: 16,
     },
     timerLabelText: {
-        fontSize: 12,
-        fontWeight: '500',
+        fontSize: 14,
         color: 'rgba(255, 255, 255, 0.6)',
         textTransform: 'uppercase',
-        letterSpacing: 1.5,
-    },
-    roundBadgeContainer: {
-        alignItems: 'center',
-        marginTop: 16,
-        marginBottom: 8,
-    },
-    nextExercise: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        opacity: 0.6,
-    },
-    nextLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#ec1313',
-        textTransform: 'uppercase',
-        letterSpacing: 1.5,
-    },
-    nextText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#ffffff',
-        textAlign: 'right',
+        letterSpacing: 1,
     },
     messageContainer: {
-        padding: 32,
+        padding: 24,
         alignItems: 'center',
     },
     messageText: {
         fontSize: 16,
-        fontWeight: '600',
         color: 'rgba(255, 255, 255, 0.7)',
         textAlign: 'center',
+        lineHeight: 24,
+    },
+    nextExercise: {
+        padding: 24,
+        alignItems: 'center',
+        gap: 8,
+    },
+    nextLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#ff8c00',
+        textTransform: 'uppercase',
+        letterSpacing: 1.5,
+    },
+    nextText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#ffffff',
+        textAlign: 'center',
+    },
+    roundBadgeContainer: {
+        alignItems: 'center',
+        paddingTop: 16,
     },
     controlsContainer: {
-        backgroundColor: '#331919',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        padding: 8,
-        paddingBottom: 16,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.05)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -5 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10,
-        elevation: 10,
-    },
-    controlButtons: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 24,
-        marginTop: 8,
-    },
-    controlPrimary: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#ec1313',
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#ec1313',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.4,
-        shadowRadius: 20,
-        elevation: 8,
-    },
-    skipButton: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    playButton: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#ec1313',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6,
-        shadowRadius: 20,
-        elevation: 8,
-    },
-    skipIcon: {
-        fontSize: 28,
-        color: '#ffffff',
-    },
-    playIcon: {
-        fontSize: 42,
-        color: '#ffffff',
-    },
-    lockButton: {
-        marginTop: 24,
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 9999,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        alignSelf: 'center',
-    },
-    lockText: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: 'rgba(255, 255, 255, 0.3)',
+        padding: 16,
+        paddingBottom: 32,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        gap: 16,
     },
     finishedIcon: {
         fontSize: 80,
@@ -1191,48 +886,11 @@ const styles = StyleSheet.create({
     },
     finishedSubtitle: {
         fontSize: 18,
-        color: 'rgba(255, 255, 255, 0.6)',
+        color: '#9ca3af',
         marginTop: 12,
         textAlign: 'center',
     },
     resetButton: {
         marginTop: 24,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    },
-    resetText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: 'rgba(255, 255, 255, 0.6)',
-    },
-    preparingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 24,
-    },
-    preparingTitle: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#ffffff',
-        marginBottom: 48,
-        letterSpacing: 4,
-    },
-    preparingTimer: {
-        fontSize: 120,
-        fontWeight: 'bold',
-        color: '#ffffff',
-        marginBottom: 24,
-    },
-    preparingSubtitle: {
-        fontSize: 18,
-        color: 'rgba(255, 255, 255, 0.6)',
-        textAlign: 'center',
     },
 });

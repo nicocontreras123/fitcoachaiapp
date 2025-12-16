@@ -19,19 +19,25 @@ export const authApi = {
   },
 
   async signup(email: string, password: string): Promise<{ access_token: string; user: any }> {
+
     const response = await fetch(`${API_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
 
+
+
     if (!response.ok) {
       const error = await response.json() as { message?: string };
+      console.error('❌ Error del servidor:', error);
       throw new Error(error.message || 'Error al registrarse');
     }
 
     const data = await response.json() as { access_token: string; user: any };
+
     await this.saveToken(data.access_token);
+
     return data;
   },
 

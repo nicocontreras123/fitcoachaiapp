@@ -127,9 +127,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await authApi.signup(email, password);
       setUser(data.user);
 
-      // Sincronizar userStore después del signup
-      const { useUserStore } = await import('@/features/profile/store/userStore');
-      await useUserStore.getState().loadUserData();
+      // No llamamos a loadUserData después del signup porque el usuario recién se registró
+      // y hasCpmompletedOnboarding será false. No es necesario hacer otra llamada al backend.
     } catch (error: any) {
       console.error('Error signing up:', error.message);
       throw error;

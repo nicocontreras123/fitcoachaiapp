@@ -97,6 +97,9 @@ export interface GenerateWorkoutParams {
     weight: number;
     height: number;
     deportes?: string[];
+    level?: 'beginner' | 'intermediate' | 'advanced';
+    equipment?: string[];
+    trainingDaysPerWeek?: number;
   };
 }
 
