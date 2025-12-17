@@ -105,12 +105,6 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
     const { timeLeft, round, isRest, isActive, isPreparing } = state;
 
     // Debug: Check totalRounds
-    console.log('🔍 [ROUNDS] Debug:', {
-        'state.totalRounds': state.totalRounds,
-        'timerConfig.totalRounds': timerConfig.totalRounds,
-        'workoutRounds.length': workoutRounds?.length,
-        'currentWorkout.rounds.length': (currentWorkout as any)?.rounds?.length,
-    });
 
     // Audio manager (separate from boxing timer for warmup/cooldown)
     const audio = useAudioManager({

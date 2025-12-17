@@ -115,9 +115,11 @@ export default function RutinasScreen() {
 
 
 
+            const userLevel = (userData as any).level || 'intermediate';
+
             await generateWeeklyRoutine({
                 sport: (userData as any).sports?.[0] || (userData as any).deportes?.[0] || 'mixed',
-                level: (userData as any).level || 'intermediate',
+                level: userLevel,
                 goals: (userData as any).goals?.[0] || (userData as any).goals || 'build-muscle',
                 availableDays: availableDays.length > 0 ? availableDays : undefined,
                 userProfile: {
@@ -125,6 +127,7 @@ export default function RutinasScreen() {
                     age: userData.age,
                     weight: userData.weight,
                     height: userData.height,
+                    level: userLevel,
                     trainingDaysPerWeek: weeklyFrequency,
                     deportes: (userData as any).sports || (userData as any).deportes || [],
                     equipment: (userData as any).equipment || [],

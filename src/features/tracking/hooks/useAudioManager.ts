@@ -67,12 +67,18 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
      */
     const speak = useCallback(
         (text: string, options?: any) => {
-            if (!voiceEnabled) return;
+            if (!voiceEnabled || !text || text === 'undefined') return;
 
-            Speech.speak(text, {
-                language,
-                ...options,
-            });
+            try {
+                Speech.speak(text, {
+                    language,
+                    pitch: 0.8,        // Voz más grave (default: 1.0)
+                    rate: 0.9,         // Ligeramente más lento para claridad
+                    ...options,
+                });
+            } catch (error) {
+                console.error('❌ [AUDIO] Error speaking:', error);
+            }
         },
         [voiceEnabled, language]
     );
@@ -83,8 +89,8 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
     const speakCountdown = useCallback(
         (count: number) => {
             speak(count.toString(), {
-                pitch: 1.2,
-                rate: 0.8,
+                pitch: 0.7,    // Más grave para énfasis
+                rate: 0.85,    // Pausado pero claro
             });
         },
         [speak]
@@ -186,6 +192,8 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
      */
     const announceExercise = useCallback(
         (exerciseName: string, details?: string) => {
+            if (!exerciseName || exerciseName === 'undefined') return;
+
             const message = details
                 ? `${exerciseName}, ${details}`
                 : exerciseName;

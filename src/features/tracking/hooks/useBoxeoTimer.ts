@@ -176,9 +176,9 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
         let interval: ReturnType<typeof setInterval>;
 
         if (state.isActive && state.timeLeft > 0) {
-
+            
             interval = setInterval(() => {
-
+                
                 dispatch({ type: 'TICK' });
             }, 1000);
         } else {
@@ -189,7 +189,7 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
 
         return () => {
             if (interval) {
-
+                
                 clearInterval(interval);
             }
         };

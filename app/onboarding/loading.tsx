@@ -145,9 +145,16 @@ export default function LoadingScreen() {
 
 
 
+                const userLevel = formData.level || 'intermediate';
+
+                console.log('🎯 Onboarding - Level selected:', {
+                    formDataLevel: formData.level,
+                    finalLevel: userLevel,
+                });
+
                 await generateWeeklyRoutine({
                     sport,
-                    level: formData.level || 'beginner',
+                    level: userLevel,
                     goals: formData.goals?.[0] || 'build-muscle',
                     availableDays: availableDays.length > 0 ? availableDays : undefined,
                     userProfile: {
@@ -155,6 +162,7 @@ export default function LoadingScreen() {
                         age: formData.age || 25,
                         weight: formData.weight || 70,
                         height: formData.height || 170,
+                        level: userLevel,
                         trainingDaysPerWeek: weeklyFrequency,
                         deportes: formData.deportes || [],
                         equipment: formData.equipment || [],
@@ -169,15 +177,17 @@ export default function LoadingScreen() {
                 setCurrentPhase(LOADING_PHASES.length); // Última fase
                 setProgress(98);
 
+                console.log('💾 Saving user data with level:', userLevel);
+
                 await completeOnboarding({
                     name: formData.name || 'Usuario',
                     age: formData.age || 25,
                     weight: formData.weight || 70,
                     height: formData.height || 170,
-                    level: (formData.level || 'beginner') as any,
+                    level: userLevel as any,
                     sports: formData.deportes || [],
                     goals: (formData.goals?.[0] || 'build-muscle') as any,
-                    trainingDays: availableDays, // Guardar los días de entrenamiento
+                    trainingDays: availableDays,
                     equipment: formData.equipment || [],
                     voiceEnabled: true,
                     timerSoundEnabled: true,

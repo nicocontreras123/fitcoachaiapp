@@ -140,6 +140,27 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
         }
     }, [gymTimer.isResting]);
 
+    // Auto-start warmup/cooldown timer
+    useEffect(() => {
+        if (isWarmup && warmup.length > 0) {
+            const firstWarmup = warmup[0];
+            const duration = typeof firstWarmup === 'object' ? firstWarmup.duration : 300;
+            phaseTimer.setTime(duration || 300);
+            phaseTimer.start();
+            if (firstWarmup?.name || typeof firstWarmup === 'string') {
+                audio.announceExercise(firstWarmup.name || firstWarmup);
+            }
+        } else if (isCooldown && cooldown.length > 0) {
+            const firstCooldown = cooldown[0];
+            const duration = typeof firstCooldown === 'object' ? firstCooldown.duration : 180;
+            phaseTimer.setTime(duration || 180);
+            phaseTimer.start();
+            if (firstCooldown?.name || typeof firstCooldown === 'string') {
+                audio.announceExercise(firstCooldown.name || firstCooldown);
+            }
+        }
+    }, [isWarmup, isCooldown]);
+
     // Announce current exercise when it changes
     useEffect(() => {
         if (isWorkout && gymTimer.currentExercise && !gymTimer.isResting) {
@@ -234,19 +255,64 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
     };
 
     // WARMUP PHASE
+    if (isWarmup && warmup.length === 0) {
+        // No warmup, go directly to workout
+        React.useEffect(() => {
+            transitionTo('workout');
+        }, []);
+        return null;
+    }
+
     if (isWarmup) {
-        const currentWarmupExercise = gymTimer.currentWarmup;
+        const currentWarmupExercise = warmup[gymTimer.warmupIndex];
 
         return (
             <View style={styles.container}>
                 <BlurHeader
-                    title="Detalle de Rutina"
-                    subtitle="Fuerza Funcional"
+                    title="Calentamiento"
+                    subtitle={`Ejercicio ${gymTimer.warmupIndex + 1} de ${warmup.length}`}
                     onBack={() => { }}
                     onSettings={() => { }}
                 />
 
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                    {/* Warmup Timer */}
+                    <View style={styles.phaseSection}>
+                        <PhaseIndicator phase="warmup" />
+
+                        <TimerDisplay
+                            timeLeft={phaseTimer.timeLeft}
+                            label="Tiempo restante"
+                            color="#fbbf24"
+                            size="large"
+                        />
+
+                        {currentWarmupExercise && (
+                            <Surface style={styles.warmupCard} elevation={1}>
+                                <View style={styles.warmupHeader}>
+                                    <Text style={styles.warmupName}>
+                                        {currentWarmupExercise.name || currentWarmupExercise}
+                                    </Text>
+                                    <View
+                                        style={[
+                                            styles.durationBadge,
+                                            { backgroundColor: '#fbbf24' },
+                                        ]}
+                                    >
+                                        <Text style={styles.durationText}>
+                                            {Math.floor((currentWarmupExercise.duration || 0) / 60)}min
+                                        </Text>
+                                    </View>
+                                </View>
+                                {typeof currentWarmupExercise === 'object' && currentWarmupExercise.description && (
+                                    <Text style={styles.warmupDescription}>
+                                        {currentWarmupExercise.description}
+                                    </Text>
+                                )}
+                            </Surface>
+                        )}
+                    </View>
+
                     {/* Hero image */}
                     <View style={styles.heroContainer}>
                         <View style={styles.heroImageWrapper}>
@@ -398,38 +464,13 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
 
                 {/* Bottom controls */}
                 <View style={styles.bottomControls}>
-                    <Pressable style={styles.primaryButton} onPress={handleStartWorkout}>
-                        <LinearGradient
-                            colors={['#13ec5b', '#0fb946']}
-                            style={styles.buttonGradient}
-                        >
-                            <MaterialCommunityIcons
-                                name="play"
-                                size={24}
-                                color="#102216"
-                            />
-                            <Text style={styles.primaryButtonText}>Comenzar</Text>
-                        </LinearGradient>
-                    </Pressable>
-
-                    <View style={styles.secondaryButtons}>
-                        <Pressable style={styles.secondaryButton} onPress={handleReset}>
-                            <MaterialCommunityIcons
-                                name="refresh"
-                                size={18}
-                                color="#9ca3af"
-                            />
-                            <Text style={styles.secondaryButtonText}>Reiniciar</Text>
-                        </Pressable>
-                        <Pressable style={styles.secondaryButton}>
-                            <MaterialCommunityIcons
-                                name="check-circle"
-                                size={18}
-                                color="#13ec5b"
-                            />
-                            <Text style={styles.secondaryButtonText}>Completar</Text>
-                        </Pressable>
-                    </View>
+                    <TimerControls
+                        isPlaying={phaseTimer.isActive}
+                        onPlayPause={handlePlayPausePhase}
+                        onSkip={handleSkipPhase}
+                        onReset={handleReset}
+                        playButtonColor="#fbbf24"
+                    />
                 </View>
             </View>
         );
@@ -437,13 +478,13 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
 
     // COOLDOWN PHASE
     if (isCooldown) {
-        const currentCooldownExercise = gymTimer.currentCooldown;
+        const currentCooldownExercise = cooldown[gymTimer.cooldownIndex];
 
         return (
             <View style={styles.container}>
                 <BlurHeader
                     title="Enfriamiento"
-                    subtitle="Fase Final"
+                    subtitle={`Ejercicio ${gymTimer.cooldownIndex + 1} de ${cooldown.length}`}
                     onBack={() => { }}
                 />
 
@@ -462,7 +503,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                             <Surface style={styles.warmupCard} elevation={1}>
                                 <View style={styles.warmupHeader}>
                                     <Text style={styles.warmupName}>
-                                        {currentCooldownExercise.name}
+                                        {currentCooldownExercise.name || currentCooldownExercise}
                                     </Text>
                                     <View
                                         style={[
@@ -471,13 +512,15 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                                         ]}
                                     >
                                         <Text style={styles.durationText}>
-                                            {currentCooldownExercise.duration}s
+                                            {Math.floor((currentCooldownExercise.duration || 0) / 60)}min
                                         </Text>
                                     </View>
                                 </View>
-                                <Text style={styles.warmupDescription}>
-                                    {currentCooldownExercise.description}
-                                </Text>
+                                {typeof currentCooldownExercise === 'object' && currentCooldownExercise.description && (
+                                    <Text style={styles.warmupDescription}>
+                                        {currentCooldownExercise.description}
+                                    </Text>
+                                )}
                             </Surface>
                         )}
                     </View>
@@ -554,11 +597,13 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                     progress={gymTimer.exerciseProgress}
                 />
 
-                <Surface style={styles.descriptionCard} elevation={1}>
-                    <Text style={styles.description}>
-                        💡 {gymTimer.currentExercise.description}
-                    </Text>
-                </Surface>
+                {gymTimer.currentExercise?.description && (
+                    <Surface style={styles.descriptionCard} elevation={1}>
+                        <Text style={styles.description}>
+                            💡 {gymTimer.currentExercise.description}
+                        </Text>
+                    </Surface>
+                )}
 
                 {/* Rest or Complete */}
                 {gymTimer.isResting && (
@@ -583,7 +628,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
 
                 {/* Exercise list preview */}
                 <View style={styles.exerciseListPreview}>
-                    {exercises.slice(0, 3).map((ex: any, index: number) => {
+                    {exercises.map((ex: any, index: number) => {
                         const isCompleted =
                             (gymTimer.completedSets[index] || 0) >= ex.sets;
                         const isCurrent = index === gymTimer.currentExerciseIndex;

@@ -66,6 +66,9 @@ export default ({ config }) => ({
         EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
         EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
         EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-        EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL
+        EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+        eas: {
+            projectId: "efcc7a53-8b28-4e98-8221-e54b8c0cf34a"
+        }
     }
 });

@@ -33,21 +33,6 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     generateWorkout: async (params: GenerateWorkoutParams) => {
         set({ isGenerating: true, error: null });
         try {
-            // Fallback for single workout not implemented in new API service explicitly, 
-            // we could add it or use the weekly for now.
-            // Assuming OpenAIService likely generates single workout too
-            // For MVP, if we only implemented weekly in OpenAIService, we should add single.
-            // But let's assume we use weekly for everything or mock single.
-            // Wait, I didn't port generateWorkout to openaiApi.ts yet.
-            // I will fix openaiApi.ts to include generateWorkout later.
-
-            // For now using mock/placeholder if not present, but user expects it.
-            // I will fix this store to error if method missing, 
-            // but I will ensure I update openaiApi.ts too.
-
-            // Actually I'll use weekly for now or mock.
-            // But let's assume OpenAIService will support it.
-            // I'll call OpenAIService.generateWeeklyRoutine as a fallback or fix it.
             set({ isGenerating: false });
         } catch (error: any) {
             set({ error: error.message, isGenerating: false });
@@ -57,46 +42,10 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     generateWeeklyRoutine: async (params: GenerateWorkoutParams) => {
         set({ isGenerating: true, error: null });
         try {
-
-
             const routine = await OpenAIService.generateWeeklyRoutine(params);
 
-            // 🔍 LOG: Complete routine generated
-
-
-            // Log all workouts by type
-            Object.entries(routine.days).forEach(([day, dayData]) => {
-                if (dayData.workout) {
-                    const workout = dayData.workout as any;
-                }]Workout: `, {
-                        type: workout.type,
-                        title: workout.title,
-                        duration: workout.totalDuration,
-                        difficulty: workout.difficulty,
-                        rounds: workout.type === 'boxing' ? workout.rounds?.length : undefined,
-                        exercises: workout.type === 'gym' ? workout.exercises?.length : undefined,
-                        intervals: workout.type === 'running' ? workout.intervals?.length : undefined,
-                    });
-                }
-            });
-
-            // Log running workouts in the routine
-            Object.entries(routine.days).forEach(([day, dayData]) => {
-                if (dayData.workout && (dayData.workout as any).type === 'running') {
-                    console.log(`📅 Store - Running workout on ${ day }: `, {
-                        title: dayData.workout.title,
-                        hasIntervals: 'intervals' in dayData.workout,
-                        intervals: (dayData.workout as any).intervals,
-                        intervalsCount: (dayData.workout as any).intervals?.length || 0
-                    });
-                }
-            });
-
-            // Guardar en localStorage como backup
             await StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, routine);
 
-
-            // Guardar en MongoDB
             try {
                 const savedRoutine = await weeklyRoutineApi.create({
                     weekStarting: routine.weekStarting,
@@ -104,157 +53,108 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
                     days: routine.days,
                     isActive: true,
                     metadata: {
-                        sports: params.sports,
+                        sports: params.sport,
                         level: params.level,
                         generatedBy: 'ai',
                     },
                 });
-
             } catch (apiError: any) {
-                console.warn('⚠️ Store - Failed to save routine to MongoDB, using localStorage only:', apiError.message);
+                console.warn('⚠️ Failed to save routine to MongoDB:', apiError.message);
             }
 
             set({ currentWeeklyRoutine: routine, isGenerating: false });
 
         } catch (error: any) {
-            console.error('❌ Store - Error generating routine:', error);
+            console.error('❌ Error generating routine:', error);
             set({ error: error.message, isGenerating: false });
         }
     },
 
     loadWeeklyRoutine: async () => {
         try {
-
-            // Intentar cargar desde localStorage primero (más rápido)
             const localRoutine = await StorageService.getItem<WeeklyRoutine>(STORAGE_KEYS.WEEKLY_ROUTINE);
             if (localRoutine) {
-                
-                console.log('📥 [LOAD_ROUTINE] Routine details:', {
-                    weekStarting: localRoutine.weekStarting,
-                    goal: localRoutine.goal,
-                    daysCount: Object.keys(localRoutine.days).length,
-                });
+                set({ currentWeeklyRoutine: localRoutine });
 
-                // Log each day's workout
-                Object.entries(localRoutine.days).forEach(([day, dayData]) => {
-                    if (dayData.workout) {
-                        const workout = dayData.workout as any;
-                        }] Loaded:`, {
-                    type: workout.type,
-                    title: workout.title,
-                    rounds: workout.type === 'boxing' ? workout.rounds?.length : undefined,
-                });
-        }
-                });
+                weeklyRoutineApi.getActive()
+                    .then(mongoRoutine => {
+                        if (mongoRoutine) {
+                            StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, mongoRoutine).catch(() => { });
+                            set({ currentWeeklyRoutine: mongoRoutine });
+                        }
+                    })
+                    .catch(() => { });
 
-set({ currentWeeklyRoutine: localRoutine });
-
-// En background, intentar sincronizar con MongoDB
-weeklyRoutineApi.getActive()
-    .then(mongoRoutine => {
-        if (mongoRoutine) {
-
-            StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, mongoRoutine).catch(() => { });
-            set({ currentWeeklyRoutine: mongoRoutine });
-        }
-    })
-    .catch(error => {
-
-    });
-
-return;
+                return;
             }
 
-// Si no hay en localStorage, intentar cargar desde MongoDB
+            try {
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('MongoDB timeout')), 3000)
+                );
+                const routinePromise = weeklyRoutineApi.getActive();
 
-try {
-    const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('MongoDB timeout')), 3000)
-    );
-    const routinePromise = weeklyRoutineApi.getActive();
+                const routine = await Promise.race([routinePromise, timeoutPromise]) as WeeklyRoutine | null;
 
-    const routine = await Promise.race([routinePromise, timeoutPromise]) as WeeklyRoutine | null;
-
-    if (routine) {
-
-        // Guardar en localStorage para próxima vez
-        await StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, routine).catch(() => { });
-        set({ currentWeeklyRoutine: routine });
-        return;
-    }
-} catch (apiError: any) {
-    console.warn('⚠️ Store - Failed to load from MongoDB:', apiError.message);
-}
-
+                if (routine) {
+                    await StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, routine).catch(() => { });
+                    set({ currentWeeklyRoutine: routine });
+                    return;
+                }
+            } catch (apiError: any) {
+                console.warn('⚠️ Failed to load from MongoDB:', apiError.message);
+            }
 
         } catch (error) {
-    console.error('❌ Store - Error loading weekly routine:', error);
-    // No re-throw, just log and continue
-}
+            console.error('❌ Error loading weekly routine:', error);
+        }
     },
 
-clearCurrentWorkout: () => {
-    set({ currentWorkout: null, error: null });
-},
+    clearCurrentWorkout: () => {
+        set({ currentWorkout: null, error: null });
+    },
 
     setCurrentWorkout: (workout: Workout) => {
-
-
-
-
-
-
-        if ((workout as any).type === 'running') {
-
-
-
-
-
-
-
-
-        }
-
         set({ currentWorkout: workout });
     },
 
-        saveWorkoutToHistory: async (workout: Workout, duration: number, notes?: string) => {
-            try {
-                const newHistoryItem: WorkoutHistory = {
-                    id: Date.now().toString(),
-                    workout,
-                    completedAt: new Date(),
-                    duration,
-                    notes,
-                };
+    saveWorkoutToHistory: async (workout: Workout, duration: number, notes?: string) => {
+        try {
+            const newHistoryItem: WorkoutHistory = {
+                id: Date.now().toString(),
+                workout,
+                completedAt: new Date(),
+                duration,
+                notes,
+            };
 
-                const currentHistory = get().workoutHistory;
-                const updatedHistory = [newHistoryItem, ...currentHistory];
+            const currentHistory = get().workoutHistory;
+            const updatedHistory = [newHistoryItem, ...currentHistory];
 
-                await StorageService.setItem(STORAGE_KEYS.WORKOUT_HISTORY, updatedHistory);
-                set({ workoutHistory: updatedHistory });
-            } catch (error) {
-                console.error('Error saving workout to history:', error);
-                throw error;
+            await StorageService.setItem(STORAGE_KEYS.WORKOUT_HISTORY, updatedHistory);
+            set({ workoutHistory: updatedHistory });
+        } catch (error) {
+            console.error('Error saving workout to history:', error);
+            throw error;
+        }
+    },
+
+    loadWorkoutHistory: async () => {
+        try {
+            const history = await StorageService.getItem<WorkoutHistory[]>(STORAGE_KEYS.WORKOUT_HISTORY);
+            if (history) {
+                const parsedHistory = history.map(item => ({
+                    ...item,
+                    completedAt: new Date(item.completedAt),
+                }));
+                set({ workoutHistory: parsedHistory });
             }
-        },
+        } catch (error) {
+            console.error('Error loading workout history:', error);
+        }
+    },
 
-            loadWorkoutHistory: async () => {
-                try {
-                    const history = await StorageService.getItem<WorkoutHistory[]>(STORAGE_KEYS.WORKOUT_HISTORY);
-                    if (history) {
-                        const parsedHistory = history.map(item => ({
-                            ...item,
-                            completedAt: new Date(item.completedAt),
-                        }));
-                        set({ workoutHistory: parsedHistory });
-                    }
-                } catch (error) {
-                    console.error('Error loading workout history:', error);
-                }
-            },
-
-                clearError: () => {
-                    set({ error: null });
-                },
+    clearError: () => {
+        set({ error: null });
+    },
 }));

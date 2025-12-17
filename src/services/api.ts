@@ -56,6 +56,12 @@ export const api = {
 
       const data = await response.json();
 
+      console.log('📥 User loaded from MongoDB:', {
+        level: data.level,
+        name: data.name,
+        age: data.age,
+      });
+
       return data;
     } catch (error: any) {
       if (error.message === 'TIMEOUT') {
@@ -70,6 +76,12 @@ export const api = {
     const headers = await getAuthHeaders();
     if (!headers) throw new Error('NOT_AUTHENTICATED');
 
+    console.log('📤 Updating user in MongoDB:', {
+      level: data.level,
+      name: data.name,
+      age: data.age,
+      hasCompletedOnboarding: data.hasCompletedOnboarding,
+    });
 
     const response = await fetch(`${API_URL}/users/me`, {
       method: 'PUT',
