@@ -1,4 +1,6 @@
-export default ({ config }) => ({
+require('dotenv').config();
+
+module.exports = ({ config }) => ({
     ...config,
     name: "FitCoach AI",
     slug: "fitcoach-ai",

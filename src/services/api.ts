@@ -3,6 +3,12 @@ import Constants from 'expo-constants';
 
 const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
 
+console.log('📡 API Configuration:', {
+  API_URL,
+  fromConfig: Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL,
+  allExtras: Constants.expoConfig?.extra,
+});
+
 
 
 export async function getAuthHeaders() {

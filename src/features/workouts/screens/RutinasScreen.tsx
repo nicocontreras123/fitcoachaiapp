@@ -208,9 +208,11 @@ export default function RutinasScreen() {
                                 </View>
 
                                 <View style={styles.featuredInfo}>
-                                    <Text style={styles.featuredTitle}>{todayWorkout.workout?.title}</Text>
+                                    <Text style={styles.featuredTitle}>
+                                        {todayWorkout.workout?.title || getWorkoutTypeInfo(todayWorkout.workout).label}
+                                    </Text>
                                     <Text style={styles.featuredDescription} numberOfLines={2}>
-                                        {todayWorkout.workout?.description}
+                                        {todayWorkout.workout?.description || 'Entrenamiento personalizado generado por IA'}
                                     </Text>
 
                                     <View style={styles.featuredMeta}>
@@ -290,7 +292,7 @@ export default function RutinasScreen() {
                                             </View>
                                         </View>
                                         <Text style={styles.dayTitle} numberOfLines={1}>
-                                            {day.workout.title}
+                                            {day.workout.title || getWorkoutTypeInfo(day.workout).label}
                                         </Text>
                                         <Text style={styles.daySubtitle} numberOfLines={1}>
                                             {day.workout.totalDuration || 45} min • {

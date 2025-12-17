@@ -1,43 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Pressable, ScrollView, Animated } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView, Animated, TextInput, Modal } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CircularProgress, StatCard } from '@/components/timer';
-import { LinearGradient } from 'expo-linear-gradient';
-
-interface Interval {
-    name: string;
-    type: 'warmup' | 'work' | 'rest' | 'cooldown';
-    duration: number;
-    pace?: string;
-}
+import { RunningWorkout } from '@/features/workouts/types';
+import { useRunningTimer } from '@/features/tracking/hooks/useRunningTimer';
 
 interface RunningTrackerProps {
-    targetDistance?: number; // km
-    onTimeUpdate?: (elapsedTime: number) => void;
+    workout: RunningWorkout;
+    onComplete?: (data: any) => void;
+    onExit?: () => void;
 }
 
-export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningTrackerProps = {}) {
-    const [isRunning, setIsRunning] = useState(false);
-    const [currentIntervalIndex, setCurrentIntervalIndex] = useState(1);
-    const [timeLeft, setTimeLeft] = useState(45);
-    const [totalTime, setTotalTime] = useState(0);
-    const [distance, setDistance] = useState(3.5);
-    const [pace, setPace] = useState('5:30');
-    const [calories, setCalories] = useState(320);
-    const [heartRate, setHeartRate] = useState(154);
+export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTrackerProps) {
+    const timer = useRunningTimer({
+        workout,
+        prepTime: 10,
+        autoSave: true,
+    });
+
+    const { state, currentInterval, gps, currentPace, estimatedCalories, progress } = timer;
+
+    const [showNoteModal, setShowNoteModal] = useState(false);
+    const [noteInput, setNoteInput] = useState('');
+    const [showAutoPauseInfo, setShowAutoPauseInfo] = useState(false);
 
     const pulseAnim = useRef(new Animated.Value(1)).current;
-
-    const intervals: Interval[] = [
-        { name: 'Calentar', type: 'warmup', duration: 600, pace: '6:30' },
-        { name: 'Sprint', type: 'work', duration: 90, pace: '4:00' },
-        { name: 'Recuperar', type: 'rest', duration: 60, pace: '7:00' },
-        { name: 'Ritmo', type: 'work', duration: 900, pace: '5:15' },
-    ];
-
-    const currentInterval = intervals[currentIntervalIndex];
-    const progress = 1 - (timeLeft / (currentInterval?.duration || 1));
 
     // Pulse animation for the ring
     useEffect(() => {
@@ -56,7 +44,7 @@ export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningT
             ])
         );
 
-        if (isRunning) {
+        if (state.phase === 'active' && !state.isPaused) {
             pulseAnimation.start();
         } else {
             pulseAnimation.stop();
@@ -64,39 +52,30 @@ export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningT
         }
 
         return () => pulseAnimation.stop();
-    }, [isRunning, pulseAnim]);
+    }, [state.phase, state.isPaused, pulseAnim]);
 
-    // Timer countdown
+    // Show auto-pause info when GPS detects user stopped
     useEffect(() => {
-        let interval: NodeJS.Timeout;
-
-        if (isRunning && timeLeft > 0) {
-            interval = setInterval(() => {
-                setTimeLeft(prev => {
-                    if (prev <= 1) {
-                        // Move to next interval
-                        if (currentIntervalIndex < intervals.length - 1) {
-                            setCurrentIntervalIndex(prev => prev + 1);
-                            return intervals[currentIntervalIndex + 1].duration;
-                        } else {
-                            setIsRunning(false);
-                            return 0;
-                        }
-                    }
-                    return prev - 1;
-                });
-                setTotalTime(prev => {
-                    const newTime = prev + 1;
-                    onTimeUpdate?.(newTime);
-                    return newTime;
-                });
-            }, 1000);
+        if (gps.isTracking && !gps.isMoving && state.phase === 'active') {
+            setShowAutoPauseInfo(true);
+        } else {
+            setShowAutoPauseInfo(false);
         }
+    }, [gps.isMoving, state.phase]);
 
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [isRunning, timeLeft, currentIntervalIndex, onTimeUpdate]);
+    // Handle workout completion
+    useEffect(() => {
+        if (state.phase === 'finished') {
+            onComplete?.({
+                distance: gps.distance,
+                duration: state.totalElapsedTime,
+                calories: estimatedCalories,
+                notes: state.notes,
+                completedIntervals: state.completedIntervals,
+                failedIntervals: state.failedIntervals,
+            });
+        }
+    }, [state.phase]);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -106,42 +85,100 @@ export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningT
 
     const getIntervalColor = (type: string) => {
         switch (type) {
-            case 'warmup': return '#3b82f6';
-            case 'work': return '#13ec5b';
-            case 'rest': return '#f59e0b';
-            case 'cooldown': return '#6b7280';
-            default: return '#13ec5b';
+            case 'warm-up':
+                return '#3b82f6';
+            case 'run':
+                return '#13ec5b';
+            case 'sprint':
+                return '#f59e0b';
+            case 'recovery':
+                return '#8b5cf6';
+            case 'cool-down':
+                return '#6b7280';
+            default:
+                return '#13ec5b';
         }
     };
 
     const getIntervalIcon = (type: string) => {
         switch (type) {
-            case 'warmup': return 'walk';
-            case 'work': return 'run-fast';
-            case 'rest': return 'heart';
-            case 'cooldown': return 'check-circle';
-            default: return 'run';
+            case 'warm-up':
+                return 'walk';
+            case 'run':
+                return 'run';
+            case 'sprint':
+                return 'run-fast';
+            case 'recovery':
+                return 'heart';
+            case 'cool-down':
+                return 'check-circle';
+            default:
+                return 'run';
         }
     };
+
+    const handleTogglePlayPause = () => {
+        if (state.phase === 'idle') {
+            timer.start();
+        } else if (state.phase === 'active') {
+            if (state.isPaused) {
+                timer.resume();
+            } else {
+                timer.pause();
+            }
+        }
+    };
+
+    const handleAddNote = () => {
+        if (noteInput.trim()) {
+            const timestamp = formatTime(state.totalElapsedTime);
+            timer.addNote(`[${timestamp}] ${noteInput.trim()}`);
+            setNoteInput('');
+            setShowNoteModal(false);
+        }
+    };
+
+    const getGpsQuality = (): { text: string; color: string } => {
+        if (!gps.isTracking) {
+            return { text: 'BUSCANDO', color: '#f59e0b' };
+        }
+        // GPS quality based on speed accuracy (simplified)
+        if (gps.currentSpeed > 0 || gps.location) {
+            return { text: 'GPS ALTO', color: '#13ec5b' };
+        }
+        return { text: 'GPS BAJO', color: '#ef4444' };
+    };
+
+    const gpsQuality = getGpsQuality();
+
+    const totalDuration = workout.intervals.reduce((sum, interval) => sum + interval.duration, 0) * 60;
 
     return (
         <View style={styles.container}>
             {/* Top bar */}
             <View style={styles.topBar}>
-                <Pressable style={styles.iconButton}>
+                <Pressable style={styles.iconButton} onPress={onExit}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color="#ffffff" />
                 </Pressable>
                 <View style={styles.topCenter}>
-                    <Text style={styles.topSubtitle}>Entrenamiento</Text>
+                    <Text style={styles.topSubtitle}>{workout.title}</Text>
                     <View style={styles.gpsIndicator}>
-                        <MaterialCommunityIcons name="satellite-variant" size={14} color="#13ec5b" />
-                        <Text style={styles.gpsText}>GPS ALTO</Text>
+                        <MaterialCommunityIcons name="satellite-variant" size={14} color={gpsQuality.color} />
+                        <Text style={[styles.gpsText, { color: gpsQuality.color }]}>{gpsQuality.text}</Text>
                     </View>
                 </View>
-                <Pressable style={styles.iconButton}>
-                    <MaterialCommunityIcons name="cog" size={24} color="#ffffff" />
+                <Pressable style={styles.iconButton} onPress={() => setShowNoteModal(true)}>
+                    <MaterialCommunityIcons name="note-text" size={24} color="#ffffff" />
                 </Pressable>
             </View>
+
+            {/* Auto-pause indicator */}
+            {showAutoPauseInfo && (
+                <View style={styles.autoPauseBar}>
+                    <MaterialCommunityIcons name="pause-circle" size={18} color="#f59e0b" />
+                    <Text style={styles.autoPauseText}>Auto-pausado: no se detecta movimiento</Text>
+                </View>
+            )}
 
             {/* Interval chips */}
             <ScrollView
@@ -150,10 +187,11 @@ export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningT
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.intervalChipsContent}
             >
-                {intervals.map((interval, index) => {
-                    const isCompleted = index < currentIntervalIndex;
-                    const isCurrent = index === currentIntervalIndex;
-                    const isUpcoming = index > currentIntervalIndex;
+                {workout.intervals.map((interval, index) => {
+                    const isCompleted = state.completedIntervals.includes(index);
+                    const isFailed = state.failedIntervals.includes(index);
+                    const isCurrent = index === state.currentIntervalIndex;
+                    const isUpcoming = index > state.currentIntervalIndex;
 
                     return (
                         <View
@@ -161,24 +199,38 @@ export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningT
                             style={[
                                 styles.chip,
                                 isCompleted && styles.chipCompleted,
+                                isFailed && styles.chipFailed,
                                 isCurrent && [styles.chipActive, { backgroundColor: getIntervalColor(interval.type) }],
                                 isUpcoming && styles.chipUpcoming,
                             ]}
                         >
                             <MaterialCommunityIcons
-                                name={getIntervalIcon(interval.type) as any}
+                                name={
+                                    isFailed
+                                        ? 'close-circle'
+                                        : (getIntervalIcon(interval.type) as any)
+                                }
                                 size={isCurrent ? 18 : 16}
-                                color={isCompleted ? 'rgba(255,255,255,0.7)' : isCurrent ? '#102216' : 'rgba(255,255,255,0.4)'}
+                                color={
+                                    isFailed
+                                        ? '#ef4444'
+                                        : isCompleted
+                                        ? 'rgba(255,255,255,0.7)'
+                                        : isCurrent
+                                        ? '#102216'
+                                        : 'rgba(255,255,255,0.4)'
+                                }
                             />
                             <Text
                                 style={[
                                     styles.chipText,
                                     isCompleted && styles.chipTextCompleted,
+                                    isFailed && styles.chipTextFailed,
                                     isCurrent && styles.chipTextActive,
                                     isUpcoming && styles.chipTextUpcoming,
                                 ]}
                             >
-                                {interval.name}
+                                {interval.type.replace('-', ' ').toUpperCase()}
                             </Text>
                         </View>
                     );
@@ -193,18 +245,49 @@ export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningT
                 {/* Circular progress */}
                 <Animated.View style={[styles.progressContainer, { transform: [{ scale: pulseAnim }] }]}>
                     <CircularProgress
-                        progress={progress}
+                        progress={currentInterval ? 1 - state.timeLeft / (currentInterval.duration * 60) : 0}
                         size={260}
                         strokeWidth={12}
-                        color={getIntervalColor(currentInterval?.type)}
+                        color={currentInterval ? getIntervalColor(currentInterval.type) : '#13ec5b'}
                         backgroundColor="#1f3a29"
                     >
                         <View style={styles.progressContent}>
-                            <Text style={[styles.intervalLabel, { color: getIntervalColor(currentInterval?.type) }]}>
-                                {currentInterval?.name} {currentIntervalIndex + 1}/{intervals.length}
-                            </Text>
-                            <Text style={styles.timerLarge}>{formatTime(timeLeft)}</Text>
-                            <Text style={styles.timerSubtext}>TIEMPO RESTANTE</Text>
+                            {state.phase === 'idle' && (
+                                <>
+                                    <Text style={styles.intervalLabel}>LISTO PARA COMENZAR</Text>
+                                    <MaterialCommunityIcons name="run" size={60} color="#13ec5b" />
+                                </>
+                            )}
+                            {state.phase === 'preparing' && (
+                                <>
+                                    <Text style={styles.intervalLabel}>PREPARÁNDOTE</Text>
+                                    <Text style={styles.timerLarge}>{formatTime(state.timeLeft)}</Text>
+                                </>
+                            )}
+                            {(state.phase === 'active' || state.phase === 'paused') && currentInterval && (
+                                <>
+                                    <Text
+                                        style={[
+                                            styles.intervalLabel,
+                                            { color: getIntervalColor(currentInterval.type) },
+                                        ]}
+                                    >
+                                        {currentInterval.type.replace('-', ' ').toUpperCase()}{' '}
+                                        {state.currentIntervalIndex + 1}/{workout.intervals.length}
+                                    </Text>
+                                    <Text style={styles.timerLarge}>{formatTime(state.timeLeft)}</Text>
+                                    <Text style={styles.timerSubtext}>
+                                        {state.isPaused ? 'PAUSADO' : 'TIEMPO RESTANTE'}
+                                    </Text>
+                                </>
+                            )}
+                            {state.phase === 'finished' && (
+                                <>
+                                    <Text style={styles.intervalLabel}>¡COMPLETADO!</Text>
+                                    <MaterialCommunityIcons name="check-circle" size={60} color="#13ec5b" />
+                                    <Text style={styles.timerSubtext}>Excelente trabajo</Text>
+                                </>
+                            )}
                         </View>
                     </CircularProgress>
                 </Animated.View>
@@ -213,31 +296,31 @@ export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningT
                 <View style={styles.statsGrid}>
                     <StatCard
                         label="Distancia"
-                        value={distance.toFixed(1)}
+                        value={gps.distance.toFixed(2)}
                         unit="km"
                         icon="map-marker-distance"
                         iconColor="#13ec5b"
                     />
                     <StatCard
                         label="Ritmo"
-                        value={pace}
+                        value={currentPace || '--:--'}
                         unit="/km"
                         icon="speedometer"
                         iconColor="#13ec5b"
                     />
                     <StatCard
                         label="Calorías"
-                        value={calories}
+                        value={estimatedCalories}
                         unit="kcal"
                         icon="fire"
                         iconColor="#f97316"
                     />
                     <StatCard
-                        label="Ritmo C."
-                        value={heartRate}
-                        unit="bpm"
-                        icon="heart-pulse"
-                        iconColor="#ef4444"
+                        label="Velocidad"
+                        value={gps.currentSpeed.toFixed(1)}
+                        unit="km/h"
+                        icon="run-fast"
+                        iconColor="#8b5cf6"
                     />
                 </View>
             </View>
@@ -249,14 +332,14 @@ export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningT
                     <View style={styles.progressBarLabels}>
                         <Text style={styles.progressBarLabel}>Progreso Total</Text>
                         <Text style={styles.progressBarValue}>
-                            {formatTime(totalTime)} / {formatTime(1500)}
+                            {formatTime(state.totalElapsedTime)} / {formatTime(totalDuration)}
                         </Text>
                     </View>
                     <View style={styles.progressBarTrack}>
                         <View
                             style={[
                                 styles.progressBarFill,
-                                { width: `${(totalTime / 1500) * 100}%` }
+                                { width: `${Math.min(progress * 100, 100)}%` },
                             ]}
                         />
                     </View>
@@ -264,26 +347,97 @@ export function RunningTrackerNew({ targetDistance = 5, onTimeUpdate }: RunningT
 
                 {/* Control buttons */}
                 <View style={styles.controlButtons}>
-                    <Pressable style={styles.controlSecondary}>
+                    {/* Skip button */}
+                    <Pressable
+                        style={[
+                            styles.controlSecondary,
+                            state.phase !== 'active' && styles.controlDisabled,
+                        ]}
+                        onPress={timer.skip}
+                        disabled={state.phase !== 'active'}
+                    >
                         <MaterialCommunityIcons name="skip-next" size={28} color="#ffffff" />
                     </Pressable>
 
+                    {/* Play/Pause button */}
                     <Pressable
-                        style={[styles.controlPrimary, isRunning && styles.controlPrimaryPulse]}
-                        onPress={() => setIsRunning(!isRunning)}
+                        style={[
+                            styles.controlPrimary,
+                            (state.phase === 'active' && !state.isPaused) && styles.controlPrimaryPulse,
+                        ]}
+                        onPress={handleTogglePlayPause}
                     >
                         <MaterialCommunityIcons
-                            name={isRunning ? 'pause' : 'play'}
+                            name={
+                                state.phase === 'idle' || state.phase === 'finished'
+                                    ? 'play'
+                                    : state.isPaused
+                                    ? 'play'
+                                    : 'pause'
+                            }
                             size={48}
                             color="#102216"
                         />
                     </Pressable>
 
-                    <Pressable style={styles.controlSecondary}>
-                        <MaterialCommunityIcons name="lock-open-variant" size={24} color="#ffffff" />
+                    {/* Mark as failed / Reset button */}
+                    <Pressable
+                        style={[
+                            styles.controlSecondary,
+                            state.phase === 'idle' && styles.controlDisabled,
+                        ]}
+                        onPress={state.phase === 'active' ? timer.markAsFailed : timer.reset}
+                        disabled={state.phase === 'idle'}
+                    >
+                        <MaterialCommunityIcons
+                            name={state.phase === 'active' ? 'close-circle' : 'refresh'}
+                            size={24}
+                            color={state.phase === 'active' ? '#ef4444' : '#ffffff'}
+                        />
                     </Pressable>
                 </View>
             </View>
+
+            {/* Note Modal */}
+            <Modal
+                visible={showNoteModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowNoteModal(false)}
+            >
+                <Pressable style={styles.modalOverlay} onPress={() => setShowNoteModal(false)}>
+                    <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Agregar Nota</Text>
+                            <Pressable onPress={() => setShowNoteModal(false)}>
+                                <MaterialCommunityIcons name="close" size={24} color="#ffffff" />
+                            </Pressable>
+                        </View>
+
+                        <TextInput
+                            style={styles.noteInput}
+                            placeholder="Escribe una nota sobre tu entrenamiento..."
+                            placeholderTextColor="rgba(255,255,255,0.4)"
+                            value={noteInput}
+                            onChangeText={setNoteInput}
+                            multiline
+                            numberOfLines={4}
+                            autoFocus
+                        />
+
+                        <Pressable style={styles.modalButton} onPress={handleAddNote}>
+                            <Text style={styles.modalButtonText}>Guardar Nota</Text>
+                        </Pressable>
+
+                        {state.notes && (
+                            <View style={styles.existingNotes}>
+                                <Text style={styles.existingNotesTitle}>Notas existentes:</Text>
+                                <Text style={styles.existingNotesText}>{state.notes}</Text>
+                            </View>
+                        )}
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </View>
     );
 }
@@ -328,7 +482,21 @@ const styles = StyleSheet.create({
     gpsText: {
         fontSize: 12,
         fontWeight: '700',
-        color: '#13ec5b',
+    },
+    autoPauseBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 8,
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(245, 158, 11, 0.2)',
+    },
+    autoPauseText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#f59e0b',
     },
     intervalChips: {
         height: 64,
@@ -351,8 +519,12 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     chipCompleted: {
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        opacity: 0.5,
+        backgroundColor: 'rgba(19, 236, 91, 0.2)',
+        opacity: 0.7,
+    },
+    chipFailed: {
+        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        borderColor: '#ef4444',
     },
     chipActive: {
         backgroundColor: '#13ec5b',
@@ -369,18 +541,20 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     chipText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
         color: '#ffffff',
-        textTransform: 'uppercase',
-        letterSpacing: 1.5,
+        letterSpacing: 1,
     },
     chipTextCompleted: {
         color: 'rgba(255, 255, 255, 0.7)',
     },
+    chipTextFailed: {
+        color: '#ef4444',
+    },
     chipTextActive: {
         color: '#102216',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '900',
     },
     chipTextUpcoming: {
@@ -496,6 +670,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.05)',
     },
+    controlDisabled: {
+        opacity: 0.3,
+    },
     controlPrimary: {
         width: 96,
         height: 96,
@@ -512,5 +689,74 @@ const styles = StyleSheet.create({
     controlPrimaryPulse: {
         shadowOpacity: 0.5,
         shadowRadius: 30,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    modalContent: {
+        width: '100%',
+        maxWidth: 400,
+        backgroundColor: '#193322',
+        borderRadius: 16,
+        padding: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#ffffff',
+    },
+    noteInput: {
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 12,
+        padding: 12,
+        color: '#ffffff',
+        fontSize: 14,
+        minHeight: 100,
+        textAlignVertical: 'top',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        marginBottom: 16,
+    },
+    modalButton: {
+        backgroundColor: '#13ec5b',
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: 'center',
+    },
+    modalButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#102216',
+    },
+    existingNotes: {
+        marginTop: 16,
+        padding: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    existingNotesTitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: 'rgba(255, 255, 255, 0.6)',
+        marginBottom: 8,
+    },
+    existingNotesText: {
+        fontSize: 12,
+        color: '#ffffff',
+        lineHeight: 18,
     },
 });

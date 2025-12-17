@@ -16,6 +16,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isGoogleAuthAvailable: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
@@ -25,6 +26,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  isGoogleAuthAvailable: false,
   signInWithGoogle: async () => {},
   signInWithEmail: async () => {},
   signUpWithEmail: async () => {},
@@ -43,17 +45,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    iosClientId: Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    webClientId: Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    redirectUri: makeRedirectUri({
-      scheme: 'fitcoach',
-    }),
-  });
+  // Get client IDs from config
+  const androidClientId = Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+  const iosClientId = Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const webClientId = Constants.expoConfig?.extra?.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+
+  // Check if Google Auth is available
+  const isGoogleAuthAvailable = !!(androidClientId || iosClientId || webClientId);
+
+  // Only initialize Google Auth if client IDs are configured
+  const [request, response, promptAsync] = Google.useAuthRequest(
+    androidClientId || iosClientId || webClientId
+      ? {
+          androidClientId,
+          iosClientId,
+          webClientId,
+          redirectUri: makeRedirectUri({
+            scheme: 'fitcoach',
+          }),
+        }
+      : {
+          clientId: 'dummy', // Dummy config to prevent crash
+          redirectUri: makeRedirectUri({
+            scheme: 'fitcoach',
+          }),
+        }
+  );
 
   useEffect(() => {
     checkAuthStatus();
+
+    // Warn if Google Auth is not configured
+    if (!androidClientId && !iosClientId && !webClientId) {
+      console.warn('⚠️ Google Auth not configured. Please set EXPO_PUBLIC_GOOGLE_*_CLIENT_ID in .env');
+    }
   }, []);
 
   useEffect(() => {
@@ -152,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     loading,
+    isGoogleAuthAvailable,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,

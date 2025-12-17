@@ -10,7 +10,10 @@
       "Bash(npm start)",
       "Bash(./gradlew clean:*)",
       "Bash(echo:*)",
-      "Bash(keytool:*)"
+      "Bash(keytool:*)",
+      "Bash(cat:*)",
+      "Bash(npx expo prebuild:*)",
+      "Bash(chmod:*)"
     ]
   }
 }

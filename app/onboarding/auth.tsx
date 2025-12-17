@@ -11,7 +11,7 @@ import { PrimaryButton, SecondaryButton, PrimaryInput } from '@/components/commo
 
 export default function AuthScreen() {
   const router = useRouter();
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, isGoogleAuthAvailable } = useAuth();
 
   const [isLogin, setIsLogin] = useState(false); // Default to Sign Up
   const [email, setEmail] = useState('');
@@ -197,21 +197,25 @@ export default function AuthScreen() {
             )}
           </View>
 
-          {/* Divider */}
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>O CONTINÚA CON</Text>
-            <View style={styles.dividerLine} />
-          </View>
+          {/* Divider - Only show if Google Auth is available */}
+          {isGoogleAuthAvailable && (
+            <>
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>O CONTINÚA CON</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-          {/* Google Button */}
-          <SecondaryButton
-            onPress={handleGoogleAuth}
-            googleIcon
-            disabled={loading}
-          >
-            Google
-          </SecondaryButton>
+              {/* Google Button */}
+              <SecondaryButton
+                onPress={handleGoogleAuth}
+                googleIcon
+                disabled={loading}
+              >
+                Google
+              </SecondaryButton>
+            </>
+          )}
 
           {/* Bottom spacer */}
           <View style={styles.bottomSpacer} />

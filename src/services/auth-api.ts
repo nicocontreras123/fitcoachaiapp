@@ -3,6 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3000';
 
+console.log('🔐 Auth API Configuration:', {
+  API_URL,
+  fromConfig: Constants.expoConfig?.extra?.EXPO_PUBLIC_API_URL,
+});
+
 const TOKEN_KEY = 'fitcoach_access_token';
 
 export const authApi = {
