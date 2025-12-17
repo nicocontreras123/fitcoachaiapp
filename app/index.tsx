@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
 import { useUserStore } from '@/features/profile/store/userStore';
 import { useAuth } from '@/contexts/AuthContext';
+
+import LottieView from 'lottie-react-native';
 
 export default function Index() {
   const router = useRouter();
@@ -36,8 +38,13 @@ export default function Index() {
   }, [hasCompletedOnboarding, isLoading, user, authLoading, router]);
 
   return (
-    <View className="flex-1 items-center justify-center bg-white">
-      <ActivityIndicator size="large" color="#0284c7" />
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#102216' }}>
+      <LottieView
+        source={require('../assets/logo_animation.json')}
+        autoPlay
+        loop
+        style={{ width: 200, height: 200 }}
+      />
     </View>
   );
 }

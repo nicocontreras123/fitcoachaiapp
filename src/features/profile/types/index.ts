@@ -37,6 +37,7 @@ export interface UserData {
   // Audio settings
   voiceEnabled?: boolean; // Default: true
   timerSoundEnabled?: boolean; // Default: true
+  photoUrl?: string;
 }
 
 export interface OnboardingStepData {

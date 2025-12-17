@@ -155,13 +155,8 @@ export default function RutinasScreen() {
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
-                <Pressable style={styles.headerButton} onPress={() => router.back()}>
-                    <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-                </Pressable>
                 <Text style={styles.headerTitle}>Plan Semanal</Text>
-                <Pressable style={styles.headerButton} onPress={() => router.push('/(tabs)/profile')}>
-                    <MaterialCommunityIcons name="account-circle" size={24} color="#fff" />
-                </Pressable>
+                <View style={{ width: 40 }} />
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -173,12 +168,24 @@ export default function RutinasScreen() {
                             <Text style={styles.headlineTitle}>
                                 Tu Objetivo:{'\n'}
                                 <Text style={styles.headlineGradient}>
-                                    {currentWeeklyRoutine?.goal || 'Mejorar Rendimiento'}
+                                    {(() => {
+                                        const goal = currentWeeklyRoutine?.goal || 'Mejorar Rendimiento';
+                                        const translations: Record<string, string> = {
+                                            'Improve endurance': 'Mejorar Resistencia',
+                                            'Build muscle': 'Ganar Músculo',
+                                            'Lose weight': 'Perder Peso',
+                                            'Increase strength': 'Aumentar Fuerza',
+                                            'Keep fit': 'Mantenimiento',
+                                            'improve-endurance': 'Mejorar Resistencia',
+                                            'build-muscle': 'Ganar Músculo',
+                                            'lose-weight': 'Perder Peso',
+                                            'increase-strength': 'Aumentar Fuerza',
+                                            'keep-fit': 'Mantenimiento'
+                                        };
+                                        return translations[goal] || goal;
+                                    })()}
                                 </Text>
                             </Text>
-                        </View>
-                        <View style={styles.aiIcon}>
-                            <MaterialCommunityIcons name="auto-fix" size={24} color={COLORS.primary.DEFAULT} />
                         </View>
                     </View>
                 </View>
@@ -254,9 +261,6 @@ export default function RutinasScreen() {
                 {/* Upcoming Days Section */}
                 <View style={styles.upcomingHeader}>
                     <Text style={styles.upcomingTitle}>Próximos días</Text>
-                    <Pressable>
-                        <Text style={styles.upcomingLink}>Ver calendario</Text>
-                    </Pressable>
                 </View>
 
                 <View style={styles.upcomingList}>

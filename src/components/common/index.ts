@@ -14,3 +14,4 @@ export { LevelCard } from './LevelCard';
 export { DayButton } from './DayButton';
 export { GoalCard } from './GoalCard';
 export { Logo } from './Logo';
+export { SuccessAlert } from './SuccessAlert';

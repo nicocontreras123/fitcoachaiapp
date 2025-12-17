@@ -8,6 +8,11 @@ import { useUserStore } from '@/features/profile/store/userStore';
 import { useRouter } from 'expo-router';
 import { formatTime } from '@/utils/timeUtils';
 import { PhaseBadge, IntensityBar, ExerciseCard, BlurHeader } from '@/components/timer';
+import { SuccessAlert } from '@/components/common';
+import { useKeepAwake } from 'expo-keep-awake';
+import { WorkoutCompletedModal } from '@/features/history/WorkoutCompletedModal';
+import { useCompleteWorkout } from '@/hooks/useCompleteWorkout';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // New hooks
 import { useTimerStateMachine } from '../hooks/useTimerStateMachine';
@@ -18,6 +23,7 @@ import { useAudioManager } from '../hooks/useAudioManager';
 import {
     TimerDisplay,
     TimerControls,
+    SpotifyButton,
 } from './shared';
 
 interface TimerBoxeoProps {
@@ -70,6 +76,10 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
     const [isSoundMuted, setIsSoundMuted] = useState(false);
     const [userHasStarted, setUserHasStarted] = useState(false);
     const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+    const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+    const [showCompletedModal, setShowCompletedModal] = useState(false);
+    const [totalElapsedTime, setTotalElapsedTime] = useState(0);
+    const { completeWorkout, isSaving } = useCompleteWorkout();
 
     // State machine for phase management
     const {
@@ -255,6 +265,33 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
 
         return () => pulseAnimation.stop();
     }, [isActive, isPreparing, scaleAnim]);
+
+    // Calcular tiempo total durante el entrenamiento
+    useEffect(() => {
+        let startTime = Date.now();
+        let intervalId: NodeJS.Timeout;
+
+        if (isActive && !isPreparing && isWorkout) {
+            intervalId = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                setTotalElapsedTime(prev => prev + 1);
+            }, 1000);
+        }
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [isActive, isPreparing, isWorkout]);
+
+    // Mostrar modal cuando finaliza el entrenamiento
+    useEffect(() => {
+        if (isFinished && !showCompletedModal) {
+            setShowCompletedModal(true);
+        }
+    }, [isFinished]);
+
+    // Mantener la pantalla activa durante entrenamientos
+    useKeepAwake();
 
     // Handle preparation finish -> warmup
     useEffect(() => {
@@ -463,17 +500,229 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
             ? { primary: '#2dd4bf', gradient: ['#2dd4bf', '#0891b2'] as [string, string], bg: '#0f172a' }
             : { primary: '#ec1313', gradient: ['#ec1313', '#dc2626'] as [string, string], bg: '#221010' };
 
-    // WARMUP PHASE
-    if (isWarmup && (isPreparing || warmup.length > 0)) {
-        const currentWarmupExercise = warmup[warmupIndex];
-        const displayTime = isPreparing ? timeLeft : phaseTimer.timeLeft || warmup[0]?.duration || 300;
-        const displayTitle = isPreparing ? 'PREPÁRATE' : (currentWarmupExercise?.name || 'Calentamiento').toUpperCase();
+    const renderContent = () => {
+        // WARMUP PHASE
+        if (isWarmup && (isPreparing || warmup.length > 0)) {
+            const currentWarmupExercise = warmup[warmupIndex];
+            const displayTime = isPreparing ? timeLeft : phaseTimer.timeLeft || warmup[0]?.duration || 300;
+            const displayTitle = isPreparing ? 'PREPÁRATE' : (currentWarmupExercise?.name || 'Calentamiento').toUpperCase();
 
+            return (
+                <SafeAreaView style={[styles.container, { backgroundColor: phaseColors.bg }]} edges={['top', 'left', 'right']}>
+                    <StatusBar hidden />
+                    <BlurHeader
+                        subtitle={isPreparing ? 'Preparación' : 'Calentamiento'}
+                        onBack={handleBack}
+                        onMuteToggle={handleMuteToggle}
+                        isMuted={isSoundMuted}
+                        topBadge={
+                            <View style={styles.topTimeBadge}>
+                                <Text style={styles.topTimeText}>Restante: {formatTime(totalTimeRemaining)}</Text>
+                            </View>
+                        }
+                    />
+
+                    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                        <View style={styles.phaseHeader}>
+                            <Text style={styles.phaseTitle}>{displayTitle}</Text>
+                            {!isPreparing && (
+                                <View style={styles.phaseBadgeContainer}>
+                                    <View style={styles.phaseDot} />
+                                    <Text style={styles.phaseBadgeText}>Preparación Física</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.timerSection}>
+                            <TimerDisplay
+                                timeLeft={displayTime}
+                                label={isPreparing ? 'Comienza en' : 'Tiempo de calentamiento'}
+                                color={phaseColors.primary}
+                                size="large"
+                                animated={true}
+                                scaleAnim={scaleAnim}
+                            />
+                        </View>
+
+                        {isPreparing ? (
+                            <View style={styles.messageContainer}>
+                                <Text style={styles.messageText}>El calentamiento comenzará pronto</Text>
+                            </View>
+                        ) : (
+                            <>
+                                <ExerciseCard
+                                    title={currentWarmupExercise?.name || 'Ejercicio de Calentamiento'}
+                                    description={currentWarmupExercise?.description || 'Prepara tu cuerpo para el entrenamiento'}
+                                    currentStep="Ejercicio Actual"
+                                    colors={['#ff8c00', '#f97316']}
+                                    animated={phaseTimer.isActive}
+                                />
+
+                                <View style={styles.nextExercise}>
+                                    <Text style={styles.nextLabel}>Siguiente Ejercicio</Text>
+                                    <Text style={styles.nextText}>
+                                        {warmup[warmupIndex + 1]?.name || 'Entrenamiento Principal'}
+                                    </Text>
+                                </View>
+                            </>
+                        )}
+                    </ScrollView>
+
+                    <View style={styles.controlsContainer}>
+                        <TimerControls
+                            isPlaying={isPreparing ? isActive : phaseTimer.isActive}
+                            onPlayPause={handlePlayPress}
+                            onSkip={handleSkipExercise}
+                            onReset={handleResetRoutine}
+                            playButtonColor={isPreparing ? phaseColors.primary : '#ec1313'}
+                        />
+                    </View>
+                </SafeAreaView>
+            );
+        }
+
+        // COOLDOWN PHASE
+        if (isCooldown && cooldown.length > 0) {
+            const currentCooldownExercise = cooldown[cooldownIndex];
+
+            return (
+                <SafeAreaView style={[styles.container, { backgroundColor: '#0f172a' }]} edges={['top', 'left', 'right']}>
+                    <StatusBar hidden />
+                    <BlurHeader
+                        subtitle="Fase Final"
+                        onBack={handleBack}
+                        onMuteToggle={handleMuteToggle}
+                        isMuted={isSoundMuted}
+                        topBadge={
+                            <View style={styles.topTimeBadge}>
+                                <Text style={styles.topTimeText}>Restante: {formatTime(totalTimeRemaining)}</Text>
+                            </View>
+                        }
+                    />
+
+                    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                        <View style={styles.phaseHeader}>
+                            <Text style={styles.phaseTitle}>COOL DOWN</Text>
+                            <View style={styles.phaseBadgeContainer}>
+                                <View style={[styles.phaseDot, { backgroundColor: '#2dd4bf' }]} />
+                                <Text style={[styles.phaseBadgeText, { color: '#2dd4bf' }]}>Recuperación</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.timerSection}>
+                            <TimerDisplay
+                                timeLeft={phaseTimer.timeLeft}
+                                label="Tiempo Restante"
+                                color="#2dd4bf"
+                                size="large"
+                                animated={true}
+                                scaleAnim={scaleAnim}
+                            />
+                        </View>
+
+                        {currentCooldownExercise && (
+                            <ExerciseCard
+                                title={currentCooldownExercise.name}
+                                description={currentCooldownExercise.description}
+                                currentStep="Estiramiento Actual"
+                                colors={['#2dd4bf', '#0891b2']}
+                                totalSteps={cooldown.length}
+                                currentStepIndex={cooldownIndex}
+                                animated={phaseTimer.isActive}
+                            />
+                        )}
+
+                        <View style={styles.nextExercise}>
+                            <Text style={[styles.nextLabel, { color: '#2dd4bf' }]}>Siguiente</Text>
+                            <Text style={styles.nextText}>
+                                {cooldown[cooldownIndex + 1]?.name || 'Finalizar'}
+                            </Text>
+                        </View>
+                    </ScrollView>
+
+                    <View style={styles.controlsContainer}>
+                        <TimerControls
+                            isPlaying={phaseTimer.isActive}
+                            onPlayPause={() => phaseTimer.toggle()}
+                            onSkip={handleSkipExercise}
+                            onReset={handleResetRoutine}
+                            playButtonColor="#2dd4bf"
+                        />
+                    </View>
+                </SafeAreaView>
+            );
+        }
+
+        // FINISHED PHASE
+        if (isFinished) {
+            return (
+                <SafeAreaView
+                    style={[styles.container, { backgroundColor: '#221010', justifyContent: 'center', alignItems: 'center' }]}
+                    edges={['top', 'left', 'right']}
+                >
+                    <StatusBar hidden />
+                    <Text style={styles.finishedIcon}>🏆</Text>
+                    <Text style={styles.finishedTitle}>¡Entrenamiento Completado!</Text>
+                    <Text style={styles.finishedSubtitle}>Excelente trabajo 💪</Text>
+                    <IconButton
+                        icon="refresh"
+                        iconColor="#ec1313"
+                        size={32}
+                        onPress={handleResetRoutine}
+                        style={styles.resetButton}
+                    />
+
+                    <WorkoutCompletedModal
+                        visible={showCompletedModal}
+                        duration={totalElapsedTime}
+                        calories={Math.round((totalElapsedTime / 60) * 12)}
+                        onSave={async (notes: string) => {
+                            await completeWorkout(
+                                'boxing',
+                                totalElapsedTime,
+                                {
+                                    title: (currentWorkout as any)?.title || 'Entrenamiento de Boxeo',
+                                    difficulty: (currentWorkout as any)?.difficulty || 'intermediate',
+                                    rounds: (currentWorkout as any)?.rounds?.length || round,
+                                    roundDuration: (currentWorkout as any)?.roundDuration || 180,
+                                    restDuration: (currentWorkout as any)?.restDuration || 60,
+                                },
+                                notes
+                            );
+
+                            // Invalidar caché del dashboard para forzar refresh
+                            await AsyncStorage.removeItem('@dashboard_stats');
+
+                            setShowCompletedModal(false);
+                            setShowSuccessAlert(true);
+                        }}
+                        onSkip={() => {
+                            setShowCompletedModal(false);
+                            setShowSuccessAlert(true);
+                        }}
+                    />
+
+                    <SuccessAlert
+                        visible={showSuccessAlert}
+                        title="¡Excelente!"
+                        message="Has completado tu rutina de boxeo.\n¡Sigue así!"
+                        onClose={() => setShowSuccessAlert(false)}
+                        onContinue={() => {
+                            setShowSuccessAlert(false);
+                            router.back();
+                        }}
+                    />
+                </SafeAreaView>
+            );
+        }
+
+        // WORKOUT PHASE
         return (
             <SafeAreaView style={[styles.container, { backgroundColor: phaseColors.bg }]} edges={['top', 'left', 'right']}>
                 <StatusBar hidden />
+
                 <BlurHeader
-                    subtitle={isPreparing ? 'Preparación' : 'Calentamiento'}
+                    subtitle="Entrenamiento"
                     onBack={handleBack}
                     onMuteToggle={handleMuteToggle}
                     isMuted={isSoundMuted}
@@ -485,20 +734,36 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                 />
 
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                    {/* Round badge */}
+                    {!isPreparing && !isRest && (
+                        <View style={styles.roundBadgeContainer}>
+                            <PhaseBadge
+                                text={`ROUND ${round}/${state.totalRounds || 12}`}
+                                colors={phaseColors.gradient}
+                                animated={true}
+                            />
+                        </View>
+                    )}
+
+                    {/* Phase indicator */}
                     <View style={styles.phaseHeader}>
-                        <Text style={styles.phaseTitle}>{displayTitle}</Text>
-                        {!isPreparing && (
-                            <View style={styles.phaseBadgeContainer}>
-                                <View style={styles.phaseDot} />
-                                <Text style={styles.phaseBadgeText}>Preparación Física</Text>
-                            </View>
-                        )}
+                        <Text style={[styles.phaseTitle, { fontSize: 32 }]}>
+                            {isPreparing ? 'PREPÁRATE' : isRest ? 'DESCANSO' : `ROUND ${round}`}
+                            {!isPreparing && !isRest && <Text style={styles.phaseSubtitle}> / {state.totalRounds}</Text>}
+                        </Text>
+                        <View style={styles.phaseBadgeContainer}>
+                            <View style={[styles.phaseDot, { backgroundColor: phaseColors.primary }]} />
+                            <Text style={[styles.phaseBadgeText, { color: phaseColors.primary }]}>
+                                {isPreparing ? 'Preparación' : isRest ? 'Recuperación' : 'Fase de Trabajo'}
+                            </Text>
+                        </View>
                     </View>
 
+                    {/* Timer */}
                     <View style={styles.timerSection}>
                         <TimerDisplay
-                            timeLeft={displayTime}
-                            label={isPreparing ? 'Comienza en' : 'Tiempo de calentamiento'}
+                            timeLeft={timeLeft}
+                            label="Tiempo Restante"
                             color={phaseColors.primary}
                             size="large"
                             animated={true}
@@ -506,252 +771,75 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                         />
                     </View>
 
-                    {isPreparing ? (
-                        <View style={styles.messageContainer}>
-                            <Text style={styles.messageText}>El calentamiento comenzará pronto</Text>
-                        </View>
-                    ) : (
-                        <>
+                    {/* Exercise card */}
+                    {!isPreparing && !isRest && (
+                        <Animated.View style={{ opacity: fadeAnim }}>
                             <ExerciseCard
-                                title={currentWarmupExercise?.name || 'Ejercicio de Calentamiento'}
-                                description={currentWarmupExercise?.description || 'Prepara tu cuerpo para el entrenamiento'}
-                                currentStep="Ejercicio Actual"
-                                colors={['#ff8c00', '#f97316']}
-                                animated={phaseTimer.isActive}
+                                title={currentExercise.name}
+                                description={currentExercise.description}
+                                currentStep="Combinación Actual"
+                                totalSteps={exercises.length}
+                                currentStepIndex={currentExerciseIndex}
+                                colors={phaseColors.gradient}
+                                animated={isActive}
+                                combinationTimeLeft={(() => {
+                                    const roundDuration = currentRoundInfo?.workTime || 180;
+                                    const timeElapsed = roundDuration - timeLeft;
+                                    let accumulatedTime = 0;
+                                    for (let i = 0; i < currentExerciseIndex; i++) {
+                                        accumulatedTime += exercises[i].duration || 30;
+                                    }
+                                    const exerciseTimeElapsed = timeElapsed - accumulatedTime;
+                                    const exerciseDuration = currentExercise.duration || 30;
+                                    return Math.max(0, Math.ceil(exerciseDuration - exerciseTimeElapsed));
+                                })()}
                             />
+                        </Animated.View>
+                    )}
 
-                            <View style={styles.nextExercise}>
-                                <Text style={styles.nextLabel}>Siguiente Ejercicio</Text>
-                                <Text style={styles.nextText}>
-                                    {warmup[warmupIndex + 1]?.name || 'Entrenamiento Principal'}
-                                </Text>
-                            </View>
-                        </>
+                    {(isPreparing || isRest) && (
+                        <View style={styles.messageContainer}>
+                            <Text style={styles.messageText}>
+                                {isPreparing ? 'El entrenamiento comenzará pronto' : 'Respira profundo y recupérate'}
+                            </Text>
+                        </View>
+                    )}
+
+                    {!isPreparing && !isRest && (
+                        <View style={styles.nextExercise}>
+                            <Text style={[styles.nextLabel, { color: phaseColors.primary }]}>Siguiente</Text>
+                            <Text style={styles.nextText}>
+                                {exercises[currentExerciseIndex + 1]?.name || 'Fin del Round'}
+                            </Text>
+                        </View>
                     )}
                 </ScrollView>
 
+                {/* Controls */}
                 <View style={styles.controlsContainer}>
+                    <IntensityBar
+                        intensity={isPreparing ? 0 : isRest ? 30 : 78}
+                        label="Intensidad"
+                        color={phaseColors.primary}
+                    />
+
                     <TimerControls
-                        isPlaying={isPreparing ? isActive : phaseTimer.isActive}
+                        isPlaying={isActive}
                         onPlayPause={handlePlayPress}
                         onSkip={handleSkipExercise}
                         onReset={handleResetRoutine}
-                        playButtonColor={isPreparing ? phaseColors.primary : '#ec1313'}
+                        playButtonColor={phaseColors.primary}
                     />
                 </View>
             </SafeAreaView>
         );
-    }
+    };
 
-    // COOLDOWN PHASE
-    if (isCooldown && cooldown.length > 0) {
-        const currentCooldownExercise = cooldown[cooldownIndex];
-
-        return (
-            <SafeAreaView style={[styles.container, { backgroundColor: '#0f172a' }]} edges={['top', 'left', 'right']}>
-                <StatusBar hidden />
-                <BlurHeader
-                    subtitle="Fase Final"
-                    onBack={handleBack}
-                    onMuteToggle={handleMuteToggle}
-                    isMuted={isSoundMuted}
-                    topBadge={
-                        <View style={styles.topTimeBadge}>
-                            <Text style={styles.topTimeText}>Restante: {formatTime(totalTimeRemaining)}</Text>
-                        </View>
-                    }
-                />
-
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                    <View style={styles.phaseHeader}>
-                        <Text style={styles.phaseTitle}>COOL DOWN</Text>
-                        <View style={styles.phaseBadgeContainer}>
-                            <View style={[styles.phaseDot, { backgroundColor: '#2dd4bf' }]} />
-                            <Text style={[styles.phaseBadgeText, { color: '#2dd4bf' }]}>Recuperación</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.timerSection}>
-                        <TimerDisplay
-                            timeLeft={phaseTimer.timeLeft}
-                            label="Tiempo Restante"
-                            color="#2dd4bf"
-                            size="large"
-                            animated={true}
-                            scaleAnim={scaleAnim}
-                        />
-                    </View>
-
-                    {currentCooldownExercise && (
-                        <ExerciseCard
-                            title={currentCooldownExercise.name}
-                            description={currentCooldownExercise.description}
-                            currentStep="Estiramiento Actual"
-                            colors={['#2dd4bf', '#0891b2']}
-                            totalSteps={cooldown.length}
-                            currentStepIndex={cooldownIndex}
-                            animated={phaseTimer.isActive}
-                        />
-                    )}
-
-                    <View style={styles.nextExercise}>
-                        <Text style={[styles.nextLabel, { color: '#2dd4bf' }]}>Siguiente</Text>
-                        <Text style={styles.nextText}>
-                            {cooldown[cooldownIndex + 1]?.name || 'Finalizar'}
-                        </Text>
-                    </View>
-                </ScrollView>
-
-                <View style={styles.controlsContainer}>
-                    <TimerControls
-                        isPlaying={phaseTimer.isActive}
-                        onPlayPause={() => phaseTimer.toggle()}
-                        onSkip={handleSkipExercise}
-                        onReset={handleResetRoutine}
-                        playButtonColor="#2dd4bf"
-                    />
-                </View>
-            </SafeAreaView>
-        );
-    }
-
-    // FINISHED PHASE
-    if (isFinished) {
-        return (
-            <SafeAreaView
-                style={[styles.container, { backgroundColor: '#221010', justifyContent: 'center', alignItems: 'center' }]}
-                edges={['top', 'left', 'right']}
-            >
-                <StatusBar hidden />
-                <Text style={styles.finishedIcon}>🏆</Text>
-                <Text style={styles.finishedTitle}>¡Entrenamiento Completado!</Text>
-                <Text style={styles.finishedSubtitle}>Excelente trabajo 💪</Text>
-                <IconButton
-                    icon="refresh"
-                    iconColor="#ec1313"
-                    size={32}
-                    onPress={handleResetRoutine}
-                    style={styles.resetButton}
-                />
-            </SafeAreaView>
-        );
-    }
-
-    // WORKOUT PHASE
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: phaseColors.bg }]} edges={['top', 'left', 'right']}>
-            <StatusBar hidden />
-            <BlurHeader
-                subtitle="Entrenamiento"
-                onBack={handleBack}
-                onMuteToggle={handleMuteToggle}
-                isMuted={isSoundMuted}
-                topBadge={
-                    <View style={styles.topTimeBadge}>
-                        <Text style={styles.topTimeText}>Restante: {formatTime(totalTimeRemaining)}</Text>
-                    </View>
-                }
-            />
-
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Round badge */}
-                {!isPreparing && !isRest && (
-                    <View style={styles.roundBadgeContainer}>
-                        <PhaseBadge
-                            text={`ROUND ${round}/${state.totalRounds || 12}`}
-                            colors={phaseColors.gradient}
-                            animated={true}
-                        />
-                    </View>
-                )}
-
-                {/* Phase indicator */}
-                <View style={styles.phaseHeader}>
-                    <Text style={[styles.phaseTitle, { fontSize: 32 }]}>
-                        {isPreparing ? 'PREPÁRATE' : isRest ? 'DESCANSO' : `ROUND ${round}`}
-                        {!isPreparing && !isRest && <Text style={styles.phaseSubtitle}> / {state.totalRounds}</Text>}
-                    </Text>
-                    <View style={styles.phaseBadgeContainer}>
-                        <View style={[styles.phaseDot, { backgroundColor: phaseColors.primary }]} />
-                        <Text style={[styles.phaseBadgeText, { color: phaseColors.primary }]}>
-                            {isPreparing ? 'Preparación' : isRest ? 'Recuperación' : 'Fase de Trabajo'}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Timer */}
-                <View style={styles.timerSection}>
-                    <TimerDisplay
-                        timeLeft={timeLeft}
-                        label="Tiempo Restante"
-                        color={phaseColors.primary}
-                        size="large"
-                        animated={true}
-                        scaleAnim={scaleAnim}
-                    />
-                </View>
-
-                {/* Exercise card */}
-                {!isPreparing && !isRest && (
-                    <Animated.View style={{ opacity: fadeAnim }}>
-                        <ExerciseCard
-                            title={currentExercise.name}
-                            description={currentExercise.description}
-                            currentStep="Combinación Actual"
-                            totalSteps={exercises.length}
-                            currentStepIndex={currentExerciseIndex}
-                            colors={phaseColors.gradient}
-                            animated={isActive}
-                            combinationTimeLeft={(() => {
-                                const roundDuration = currentRoundInfo?.workTime || 180;
-                                const timeElapsed = roundDuration - timeLeft;
-                                let accumulatedTime = 0;
-                                for (let i = 0; i < currentExerciseIndex; i++) {
-                                    accumulatedTime += exercises[i].duration || 30;
-                                }
-                                const exerciseTimeElapsed = timeElapsed - accumulatedTime;
-                                const exerciseDuration = currentExercise.duration || 30;
-                                return Math.max(0, Math.ceil(exerciseDuration - exerciseTimeElapsed));
-                            })()}
-                        />
-                    </Animated.View>
-                )}
-
-                {(isPreparing || isRest) && (
-                    <View style={styles.messageContainer}>
-                        <Text style={styles.messageText}>
-                            {isPreparing ? 'El entrenamiento comenzará pronto' : 'Respira profundo y recupérate'}
-                        </Text>
-                    </View>
-                )}
-
-                {!isPreparing && !isRest && (
-                    <View style={styles.nextExercise}>
-                        <Text style={[styles.nextLabel, { color: phaseColors.primary }]}>Siguiente</Text>
-                        <Text style={styles.nextText}>
-                            {exercises[currentExerciseIndex + 1]?.name || 'Fin del Round'}
-                        </Text>
-                    </View>
-                )}
-            </ScrollView>
-
-            {/* Controls */}
-            <View style={styles.controlsContainer}>
-                <IntensityBar
-                    intensity={isPreparing ? 0 : isRest ? 30 : 78}
-                    label="Intensidad"
-                    color={phaseColors.primary}
-                />
-
-                <TimerControls
-                    isPlaying={isActive}
-                    onPlayPause={handlePlayPress}
-                    onSkip={handleSkipExercise}
-                    onReset={handleResetRoutine}
-                    playButtonColor={phaseColors.primary}
-                />
-            </View>
-        </SafeAreaView>
+        <View style={styles.container}>
+            {renderContent()}
+            {!isFinished && <SpotifyButton position="top-right" />}
+        </View>
     );
 };
 

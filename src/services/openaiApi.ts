@@ -56,10 +56,12 @@ const EXERCISE_POOLS = {
       '1-2-3-2 (Jab-Cross-Hook-Cross)',
       '1-6-3-2 (Jab-Uppercut-Hook-Cross)',
       '3-2-3 (Hook-Cross-Hook)',
-      '1-1-2-3-2',
+      '1-1-2-3-2 (Jab-Jab-Jab-Cross-Cross)',
       '4-3-2 (Uppercut-Hook-Cross)',
-      'Double jab + Cross + Duck',
-      '1-2 + Slip + 3-2',
+      '1-1-3-Esquivar (Double jab + Cross + Esquivar)',
+      '1-2 + 1-2 + Slip + 3-2 (Jab-Cross-Jab-Cross + Slip + Hook-Cross)',
+      '1-2 + 1-2 + Slip + 3-2 + 1-2 (Jab-Cross-Jab-Cross + Slip + Hook-Cross + Jab-Cross)',
+      '1-2 + 1-2 + Slip + 3-2 + 1-2 + 1-2 (Jab-Cross-Jab-Cross + Slip + Hook-Cross + Jab-Cross + Jab-Cross)',
     ],
     drills: [
       'Burpees con jab',
@@ -292,6 +294,8 @@ BOXING formato:
 RUNNING formato:
 {
   "type": "running",
+  "title": "Nombre único del entrenamiento",
+  "description": "Descripción del enfoque de la sesión",
   "intervals": [
     {"type": "warm-up", "duration": 5, "pace": "6:00 min/km", "description": "..."},
     {"type": "run", "duration": 10, "pace": "5:30 min/km", "description": "..."},
@@ -304,6 +308,8 @@ RUNNING formato:
 GYM formato:
 {
   "type": "gym",
+  "title": "Nombre único del entrenamiento",
+  "description": "Descripción específica del enfoque",
   "exercises": [{"name": "...", "sets": 3, "reps": 12, "weight": "Moderado"}],
   "warmup": ["Cardio 5min", "Movilidad dinámica"],
   "cooldown": ["Estiramiento completo", "Foam rolling"],

@@ -8,10 +8,12 @@ interface TimerControlsProps {
     onSkip?: () => void;
     onPrevious?: () => void;
     onReset?: () => void;
+    onComplete?: () => void;
     playButtonColor?: string;
     disabled?: boolean;
     disablePrevious?: boolean;
     disableSkip?: boolean;
+    disableReset?: boolean;
 }
 
 export const TimerControls: React.FC<TimerControlsProps> = ({
@@ -20,10 +22,12 @@ export const TimerControls: React.FC<TimerControlsProps> = ({
     onSkip,
     onPrevious,
     onReset,
+    onComplete,
     playButtonColor = '#ec1313',
     disabled = false,
     disablePrevious = false,
     disableSkip = false,
+    disableReset = false,
 }) => {
     return (
         <View style={styles.container}>
@@ -32,12 +36,12 @@ export const TimerControls: React.FC<TimerControlsProps> = ({
                     <Pressable
                         style={styles.skipButton}
                         onPress={onReset}
-                        disabled={disabled}
+                        disabled={disabled || disableReset}
                     >
                         <MaterialCommunityIcons
                             name="restart"
                             size={28}
-                            color={disabled ? 'rgba(255,255,255,0.2)' : '#ffffff'}
+                            color={disabled || disableReset ? 'rgba(255,255,255,0.2)' : '#ffffff'}
                         />
                     </Pressable>
                 )}
@@ -72,7 +76,19 @@ export const TimerControls: React.FC<TimerControlsProps> = ({
                     />
                 </Pressable>
 
-                {onSkip && (
+                {onComplete ? (
+                    <Pressable
+                        style={[styles.skipButton, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}
+                        onPress={onComplete}
+                        disabled={disabled}
+                    >
+                        <MaterialCommunityIcons
+                            name="check"
+                            size={28}
+                            color="#10b981"
+                        />
+                    </Pressable>
+                ) : onSkip ? (
                     <Pressable
                         style={styles.skipButton}
                         onPress={onSkip}
@@ -88,7 +104,7 @@ export const TimerControls: React.FC<TimerControlsProps> = ({
                             }
                         />
                     </Pressable>
-                )}
+                ) : null}
             </View>
         </View>
     );

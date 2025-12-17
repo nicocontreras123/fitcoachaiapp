@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
         alignItems: 'baseline',
     },
     value: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
         color: '#ffffff',
     },

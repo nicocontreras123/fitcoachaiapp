@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CircularProgress, StatCard } from '@/components/timer';
 import { RunningWorkout } from '@/features/workouts/types';
 import { useRunningTimer } from '@/features/tracking/hooks/useRunningTimer';
+import { SpotifyButton } from '@/features/tracking/components/shared';
 
 interface RunningTrackerProps {
     workout: RunningWorkout;
@@ -100,6 +101,18 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
         }
     };
 
+    const getIntervalName = (type: string) => {
+        switch (type) {
+            case 'warm-up': return 'CALENTAMIENTO';
+            case 'run': return 'CORRER';
+            case 'sprint': return 'VELOCIDAD';
+            case 'recovery': return 'RECUPERACIÓN';
+            case 'cool-down': return 'ENFRIAMIENTO';
+            case 'rest': return 'DESCANSAR';
+            default: return type.toUpperCase().replace('-', ' ');
+        }
+    };
+
     const getIntervalIcon = (type: string) => {
         switch (type) {
             case 'warm-up':
@@ -152,6 +165,7 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
     const gpsQuality = getGpsQuality();
 
     const totalDuration = workout.intervals.reduce((sum, interval) => sum + interval.duration, 0) * 60;
+    const totalTimeRemaining = totalDuration - state.totalElapsedTime;
 
     return (
         <View style={styles.container}>
@@ -167,9 +181,16 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                         <Text style={[styles.gpsText, { color: gpsQuality.color }]}>{gpsQuality.text}</Text>
                     </View>
                 </View>
-                <Pressable style={styles.iconButton} onPress={() => setShowNoteModal(true)}>
-                    <MaterialCommunityIcons name="note-text" size={24} color="#ffffff" />
-                </Pressable>
+
+                {/* Time Badge instead of Note button */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={styles.topTimeBadge}>
+                        <Text style={styles.topTimeText}>Restante: {formatTime(Math.max(0, totalTimeRemaining))}</Text>
+                    </View>
+                    <Pressable style={styles.iconButton} onPress={() => setShowNoteModal(true)}>
+                        <MaterialCommunityIcons name="note-text" size={24} color="#ffffff" />
+                    </Pressable>
+                </View>
             </View>
 
             {/* Auto-pause indicator */}
@@ -215,10 +236,10 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                                     isFailed
                                         ? '#ef4444'
                                         : isCompleted
-                                        ? 'rgba(255,255,255,0.7)'
-                                        : isCurrent
-                                        ? '#102216'
-                                        : 'rgba(255,255,255,0.4)'
+                                            ? 'rgba(255,255,255,0.7)'
+                                            : isCurrent
+                                                ? '#102216'
+                                                : 'rgba(255,255,255,0.4)'
                                 }
                             />
                             <Text
@@ -230,7 +251,7 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                                     isUpcoming && styles.chipTextUpcoming,
                                 ]}
                             >
-                                {interval.type.replace('-', ' ').toUpperCase()}
+                                {getIntervalName(interval.type)}
                             </Text>
                         </View>
                     );
@@ -238,7 +259,11 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
             </ScrollView>
 
             {/* Main content */}
-            <View style={styles.mainContent}>
+            <ScrollView
+                style={styles.mainContent}
+                contentContainerStyle={styles.mainContentScroll}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Background pattern */}
                 <View style={styles.backgroundPattern} />
 
@@ -272,7 +297,8 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                                             { color: getIntervalColor(currentInterval.type) },
                                         ]}
                                     >
-                                        {currentInterval.type.replace('-', ' ').toUpperCase()}{' '}
+
+                                        {getIntervalName(currentInterval.type)}{' '}
                                         {state.currentIntervalIndex + 1}/{workout.intervals.length}
                                     </Text>
                                     <Text style={styles.timerLarge}>{formatTime(state.timeLeft)}</Text>
@@ -294,36 +320,44 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
 
                 {/* Stats grid */}
                 <View style={styles.statsGrid}>
-                    <StatCard
-                        label="Distancia"
-                        value={gps.distance.toFixed(2)}
-                        unit="km"
-                        icon="map-marker-distance"
-                        iconColor="#13ec5b"
-                    />
-                    <StatCard
-                        label="Ritmo"
-                        value={currentPace || '--:--'}
-                        unit="/km"
-                        icon="speedometer"
-                        iconColor="#13ec5b"
-                    />
-                    <StatCard
-                        label="Calorías"
-                        value={estimatedCalories}
-                        unit="kcal"
-                        icon="fire"
-                        iconColor="#f97316"
-                    />
-                    <StatCard
-                        label="Velocidad"
-                        value={gps.currentSpeed.toFixed(1)}
-                        unit="km/h"
-                        icon="run-fast"
-                        iconColor="#8b5cf6"
-                    />
+                    <View style={styles.statCardWrapper}>
+                        <StatCard
+                            label="Distancia"
+                            value={gps.distance.toFixed(2)}
+                            unit="km"
+                            icon="map-marker-distance"
+                            iconColor="#13ec5b"
+                        />
+                    </View>
+                    <View style={styles.statCardWrapper}>
+                        <StatCard
+                            label="Ritmo"
+                            value={currentPace || '--:--'}
+                            unit="/km"
+                            icon="speedometer"
+                            iconColor="#13ec5b"
+                        />
+                    </View>
+                    <View style={styles.statCardWrapper}>
+                        <StatCard
+                            label="Calorías"
+                            value={estimatedCalories}
+                            unit="kcal"
+                            icon="fire"
+                            iconColor="#f97316"
+                        />
+                    </View>
+                    <View style={styles.statCardWrapper}>
+                        <StatCard
+                            label="Velocidad"
+                            value={gps.currentSpeed.toFixed(1)}
+                            unit="km/h"
+                            icon="run-fast"
+                            iconColor="#8b5cf6"
+                        />
+                    </View>
                 </View>
-            </View>
+            </ScrollView>
 
             {/* Bottom controls */}
             <View style={styles.bottomControls}>
@@ -372,31 +406,33 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                                 state.phase === 'idle' || state.phase === 'finished'
                                     ? 'play'
                                     : state.isPaused
-                                    ? 'play'
-                                    : 'pause'
+                                        ? 'play'
+                                        : 'pause'
                             }
                             size={48}
                             color="#102216"
                         />
                     </Pressable>
 
-                    {/* Mark as failed / Reset button */}
+                    {/* Stop / Reset button */}
                     <Pressable
                         style={[
                             styles.controlSecondary,
                             state.phase === 'idle' && styles.controlDisabled,
                         ]}
-                        onPress={state.phase === 'active' ? timer.markAsFailed : timer.reset}
+                        onPress={timer.reset}
                         disabled={state.phase === 'idle'}
                     >
                         <MaterialCommunityIcons
-                            name={state.phase === 'active' ? 'close-circle' : 'refresh'}
+                            name="stop"
                             size={24}
                             color={state.phase === 'active' ? '#ef4444' : '#ffffff'}
                         />
                     </Pressable>
                 </View>
             </View>
+
+            {state.phase !== 'finished' && <SpotifyButton position="top-right" />}
 
             {/* Note Modal */}
             <Modal
@@ -462,6 +498,19 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    topTimeBadge: {
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    topTimeText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#ffffff',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     topCenter: {
         flex: 1,
@@ -562,10 +611,13 @@ const styles = StyleSheet.create({
     },
     mainContent: {
         flex: 1,
+    },
+    mainContentScroll: {
+        flexGrow: 1,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 24,
-        position: 'relative',
+        paddingBottom: 20,
     },
     backgroundPattern: {
         position: 'absolute',
@@ -606,9 +658,13 @@ const styles = StyleSheet.create({
     statsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 12,
+        justifyContent: 'space-between',
         width: '100%',
         marginTop: 8,
+    },
+    statCardWrapper: {
+        width: '48%',
+        marginBottom: 12,
     },
     bottomControls: {
         paddingHorizontal: 24,

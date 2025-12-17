@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 
 /**
  * Phase Timer Hook
  * Manages countdown logic for a single phase
- * Replaces multiple useEffect hooks with a single, focused timer
+ * Uses timestamps to continue running in background
  */
 
 interface PhaseTimerConfig {
@@ -25,43 +26,73 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
 
     const [timeLeft, setTimeLeft] = useState(initialTime);
     const [isActive, setIsActive] = useState(autoStart);
-    const intervalRef = useRef<NodeJS.Timeout>();
+    const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
     const hasCalledCountdownRef = useRef<Set<number>>(new Set());
 
-    // Timer tick effect
+    // Timestamp-based tracking for background support
+    const startTimestampRef = useRef<number | null>(null);
+    const totalDurationRef = useRef<number>(initialTime);
+
+    // Timer tick effect using timestamps for background support
     useEffect(() => {
-        if (!isActive || timeLeft <= 0) {
+        if (!isActive) {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = undefined;
             }
+            startTimestampRef.current = null;
             return;
         }
 
+        // Initialize start timestamp if not set
+        if (startTimestampRef.current === null) {
+            startTimestampRef.current = Date.now();
+            totalDurationRef.current = timeLeft;
+        }
+
+        // Don't recreate interval if already exists
+        if (intervalRef.current) {
+            return;
+        }
+
+        const calculateTimeLeft = () => {
+            if (startTimestampRef.current === null) return timeLeft;
+
+            const elapsed = Math.floor((Date.now() - startTimestampRef.current) / 1000);
+            const remaining = Math.max(0, totalDurationRef.current - elapsed);
+            return remaining;
+        };
+
         intervalRef.current = setInterval(() => {
-            setTimeLeft((prev) => {
-                const newTime = Math.max(0, prev - 1);
+            const newTime = calculateTimeLeft();
 
-                // Call onTick callback
-                onTick?.(newTime);
+            if (newTime <= 0) {
+                clearInterval(intervalRef.current!);
+                intervalRef.current = undefined;
+                startTimestampRef.current = null;
+                setTimeLeft(0);
+                return;
+            }
 
-                // Call countdown callback for 3, 2, 1
-                if (
-                    newTime <= 3 &&
-                    newTime > 0 &&
-                    !hasCalledCountdownRef.current.has(newTime)
-                ) {
-                    hasCalledCountdownRef.current.add(newTime);
-                    onCountdown?.(newTime);
-                }
+            setTimeLeft(newTime);
 
-                // Reset countdown tracking when time > 3
-                if (newTime > 3) {
-                    hasCalledCountdownRef.current.clear();
-                }
+            // Call onTick callback
+            onTick?.(newTime);
 
-                return newTime;
-            });
+            // Call countdown callback for 3, 2, 1
+            if (
+                newTime <= 3 &&
+                newTime > 0 &&
+                !hasCalledCountdownRef.current.has(newTime)
+            ) {
+                hasCalledCountdownRef.current.add(newTime);
+                onCountdown?.(newTime);
+            }
+
+            // Reset countdown tracking when time > 3
+            if (newTime > 3) {
+                hasCalledCountdownRef.current.clear();
+            }
         }, 1000);
 
         return () => {
@@ -70,7 +101,23 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
                 intervalRef.current = undefined;
             }
         };
-    }, [isActive, timeLeft, onTick, onCountdown]);
+    }, [isActive]);
+
+    // AppState listener to sync when returning from background
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+            if (nextAppState === 'active' && isActive && startTimestampRef.current !== null) {
+                // App returned from background, recalculate time
+                const elapsed = Math.floor((Date.now() - startTimestampRef.current) / 1000);
+                const remaining = Math.max(0, totalDurationRef.current - elapsed);
+                setTimeLeft(remaining);
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [isActive]);
 
     // Handle completion
     useEffect(() => {
@@ -82,15 +129,20 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
 
     // Control functions
     const start = useCallback(() => {
+        startTimestampRef.current = Date.now();
+        totalDurationRef.current = timeLeft;
         setIsActive(true);
-    }, []);
+    }, [timeLeft]);
 
     const pause = useCallback(() => {
         setIsActive(false);
+        startTimestampRef.current = null;
     }, []);
 
     const resume = useCallback(() => {
         if (timeLeft > 0) {
+            startTimestampRef.current = Date.now();
+            totalDurationRef.current = timeLeft;
             setIsActive(true);
         }
     }, [timeLeft]);
@@ -98,6 +150,8 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
     const reset = useCallback((newTime?: number) => {
         setIsActive(false);
         setTimeLeft(newTime ?? initialTime);
+        startTimestampRef.current = null;
+        totalDurationRef.current = newTime ?? initialTime;
         hasCalledCountdownRef.current.clear();
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
@@ -107,11 +161,31 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
 
     const setTime = useCallback((newTime: number) => {
         setTimeLeft(newTime);
+        startTimestampRef.current = null;
+        totalDurationRef.current = newTime;
         hasCalledCountdownRef.current.clear();
     }, []);
 
     const toggle = useCallback(() => {
-        setIsActive((prev) => !prev);
+        setIsActive((prev) => {
+            if (!prev) {
+                // Starting
+                startTimestampRef.current = Date.now();
+                totalDurationRef.current = timeLeft;
+            } else {
+                // Pausing
+                startTimestampRef.current = null;
+            }
+            return !prev;
+        });
+    }, [timeLeft]);
+
+    const setTimeAndStart = useCallback((newTime: number) => {
+        setTimeLeft(newTime);
+        startTimestampRef.current = Date.now();
+        totalDurationRef.current = newTime;
+        hasCalledCountdownRef.current.clear();
+        setIsActive(true);
     }, []);
 
     return {
@@ -126,6 +200,7 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
         resume,
         reset,
         setTime,
+        setTimeAndStart,
         toggle,
     };
 };

@@ -1,6 +1,6 @@
 import { View, StyleSheet, Alert, ImageBackground, ScrollView, Pressable, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Text } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,12 +11,60 @@ import { PrimaryButton, SecondaryButton, PrimaryInput } from '@/components/commo
 
 export default function AuthScreen() {
   const router = useRouter();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, isGoogleAuthAvailable } = useAuth();
 
-  const [isLogin, setIsLogin] = useState(false); // Default to Sign Up
+  const [isLogin, setIsLogin] = useState(mode === 'login'); // Set based on URL parameter
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Update isLogin when mode parameter changes
+  useEffect(() => {
+    if (mode === 'login') {
+      setIsLogin(true);
+    }
+  }, [mode]);
+
+  // Email validation helper
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Password validation helper - Strong password requirements
+  const isValidPassword = (password: string): boolean => {
+    // At least 8 characters
+    if (password.length < 8) return false;
+
+    // At least one uppercase letter
+    if (!/[A-Z]/.test(password)) return false;
+
+    // At least one lowercase letter
+    if (!/[a-z]/.test(password)) return false;
+
+    // At least one number
+    if (!/[0-9]/.test(password)) return false;
+
+    // At least one special character
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return false;
+
+    return true;
+  };
+
+  // Get password strength message
+  const getPasswordStrengthMessage = (): string | null => {
+    if (password.length === 0) return null;
+    if (password.length < 8) return 'Mínimo 8 caracteres';
+    if (!/[A-Z]/.test(password)) return 'Falta una mayúscula';
+    if (!/[a-z]/.test(password)) return 'Falta una minúscula';
+    if (!/[0-9]/.test(password)) return 'Falta un número';
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return 'Falta un carácter especial (!@#$%...)';
+    return null;
+  };
+
+  // Check if form is valid - different requirements for login vs signup
+  const isFormValid = isValidEmail(email) && (isLogin ? password.length >= 6 : isValidPassword(password));
 
   const handleEmailAuth = async () => {
     if (!email || !password) {
@@ -108,11 +156,6 @@ export default function AuthScreen() {
             style={styles.headerGradient}
           />
         </ImageBackground>
-
-        {/* Logo Badge */}
-        <View style={styles.logoBadge}>
-          <MaterialCommunityIcons name="lightning-bolt" size={28} color={COLORS.primary.DEFAULT} />
-        </View>
       </View>
 
       {/* KeyboardAvoidingView wrapping ScrollView */}
@@ -178,6 +221,23 @@ export default function AuthScreen() {
               autoCapitalize="none"
             />
 
+            {/* Password Strength Indicator - Only show when registering */}
+            {!isLogin && password.length > 0 && (
+              <View style={styles.passwordStrengthContainer}>
+                {getPasswordStrengthMessage() ? (
+                  <View style={styles.passwordStrengthWeak}>
+                    <MaterialCommunityIcons name="alert-circle" size={16} color="#f59e0b" />
+                    <Text style={styles.passwordStrengthText}>{getPasswordStrengthMessage()}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.passwordStrengthStrong}>
+                    <MaterialCommunityIcons name="check-circle" size={16} color={COLORS.primary.DEFAULT} />
+                    <Text style={styles.passwordStrengthTextStrong}>Contraseña segura</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Main Action Button */}
             {loading ? (
               <View style={styles.loadingButton}>
@@ -190,7 +250,7 @@ export default function AuthScreen() {
               <PrimaryButton
                 onPress={handleEmailAuth}
                 icon="arrow-right"
-                disabled={loading}
+                disabled={!isFormValid || loading}
               >
                 {isLogin ? 'INICIAR SESIÓN' : 'CREAR CUENTA'}
               </PrimaryButton>
@@ -349,6 +409,42 @@ const styles = StyleSheet.create({
     fontFamily: 'Lexend_500Medium',
     color: '#6b7280',
     marginHorizontal: 12,
+  },
+  passwordStrengthContainer: {
+    marginTop: -8,
+    marginBottom: 8,
+  },
+  passwordStrengthWeak: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  passwordStrengthStrong: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: `${COLORS.primary.DEFAULT}15`,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary.DEFAULT}30`,
+  },
+  passwordStrengthText: {
+    fontSize: 12,
+    fontFamily: 'Lexend_500Medium',
+    color: '#f59e0b',
+  },
+  passwordStrengthTextStrong: {
+    fontSize: 12,
+    fontFamily: 'Lexend_500Medium',
+    color: COLORS.primary.DEFAULT,
   },
   bottomSpacer: {
     height: 24,

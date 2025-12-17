@@ -6,6 +6,12 @@ import { Text, IconButton, Surface } from 'react-native-paper';
 import { useUserStore } from '@/features/profile/store/userStore';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
+import { SuccessAlert } from '@/components/common';
+import { useRouter } from 'expo-router';
+import { useKeepAwake } from 'expo-keep-awake';
+import { WorkoutCompletedModal } from '@/features/history/WorkoutCompletedModal';
+import { useCompleteWorkout } from '@/hooks/useCompleteWorkout';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface TimerRunningProps {
     intervals: RunningInterval[];
@@ -15,6 +21,10 @@ interface TimerRunningProps {
 
 export const TimerRunning: React.FC<TimerRunningProps> = ({ intervals, onTimeUpdate, onComplete }) => {
     const { userData } = useUserStore();
+    const router = useRouter();
+    const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+    const [showCompletedModal, setShowCompletedModal] = useState(false);
+    const { completeWorkout } = useCompleteWorkout();
 
     // GPS Tracker for real distance and movement detection
     const {
@@ -143,10 +153,16 @@ export const TimerRunning: React.FC<TimerRunningProps> = ({ intervals, onTimeUpd
 
     // Handle completion
     useEffect(() => {
-        if (isFinished() && onComplete) {
-            onComplete();
+        if (isFinished() && !showCompletedModal) {
+            setShowCompletedModal(true);
+            if (onComplete) {
+                onComplete();
+            }
         }
     }, [currentInterval, isActive]);
+
+    // Mantener la pantalla activa durante entrenamientos
+    useKeepAwake();
 
     // Pulse animation for timer
     useEffect(() => {
@@ -254,6 +270,51 @@ export const TimerRunning: React.FC<TimerRunningProps> = ({ intervals, onTimeUpd
                         size={32}
                         onPress={resetTimer}
                         style={styles.resetButton}
+                    />
+
+                    <WorkoutCompletedModal
+                        visible={showCompletedModal}
+                        duration={elapsedTime}
+                        calories={Math.round((elapsedTime / 60) * 10)}
+                        onSave={async (notes: string) => {
+                            await completeWorkout(
+                                'running',
+                                elapsedTime,
+                                {
+                                    title: 'Running Interval Training',
+                                    difficulty: 'intermediate',
+                                    distance: gpsDistance,
+                                    intervals: intervals.map(i => ({
+                                        type: i.type,
+                                        duration: i.duration,
+                                        pace: i.pace,
+                                    })),
+                                    totalDuration: intervals.reduce((sum, i) => sum + i.duration, 0),
+                                },
+                                notes
+                            );
+
+                            // Invalidar caché del dashboard para forzar refresh
+                            await AsyncStorage.removeItem('@dashboard_stats');
+
+                            setShowCompletedModal(false);
+                            setShowSuccessAlert(true);
+                        }}
+                        onSkip={() => {
+                            setShowCompletedModal(false);
+                            setShowSuccessAlert(true);
+                        }}
+                    />
+
+                    <SuccessAlert
+                        visible={showSuccessAlert}
+                        title="¡Excelente!"
+                        message="Has completado tu rutina de running.\n¡Sigue así!"
+                        onClose={() => setShowSuccessAlert(false)}
+                        onContinue={() => {
+                            setShowSuccessAlert(false);
+                            router.back();
+                        }}
                     />
                 </View>
             </Surface>

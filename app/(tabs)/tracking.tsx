@@ -56,8 +56,9 @@ export default function TrackingPage() {
   if (isRunning) {
     return (
       <RunningTrackerNew
-        targetDistance={5}
-        onTimeUpdate={setElapsedTime}
+        workout={currentWorkout as any}
+        onComplete={() => router.back()}
+        onExit={() => router.back()}
       />
     );
   }

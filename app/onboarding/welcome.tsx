@@ -1,8 +1,7 @@
-import { View, StyleSheet, ImageBackground } from 'react-native';
+import { View, StyleSheet, ImageBackground, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Text } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { PrimaryButton } from '@/components/common/PrimaryButton';
 import { FeatureChip } from '@/components/common/FeatureChip';
@@ -58,9 +57,11 @@ export default function WelcomeScreen() {
       <View style={styles.content}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <MaterialCommunityIcons name="lightning-bolt" size={36} color={COLORS.primary.DEFAULT} />
-          </View>
+          <Image
+            source={require('../../assets/fitcoach_logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Bottom Section */}
@@ -69,18 +70,21 @@ export default function WelcomeScreen() {
           <View style={styles.headlineContainer}>
             <Text style={styles.headline}>
               Tu entrenador{'\n'}
-              <Text style={styles.headlineAccent}>personal inteligente</Text>
+              <Text style={styles.headlineAccent}>personal con IA</Text>
             </Text>
             <Text style={styles.subtitle}>
-              Rutinas de boxeo, running y funcional adaptadas a ti con IA.
+              Entrena más inteligente con rutinas personalizadas de boxeo, running y gimnasio.
+              Seguimiento GPS en tiempo real, asistente de voz y planes adaptados a tus objetivos.
             </Text>
           </View>
 
           {/* Feature Chips */}
           <View style={styles.chipsContainer}>
-            <FeatureChip emoji="🥊" label="Boxeo" />
-            <FeatureChip emoji="🏃" label="Running con GPS" />
+            <FeatureChip emoji="🥊" label="Boxeo & Funcional" />
+            <FeatureChip emoji="🏃" label="Running GPS" />
             <FeatureChip icon="robot" label="IA Personalizada" />
+            <FeatureChip emoji="🎯" label="Seguimiento" />
+            <FeatureChip emoji="🎤" label="Asistente de Voz" />
           </View>
 
           {/* Spacer */}
@@ -101,7 +105,7 @@ export default function WelcomeScreen() {
             ¿Ya tienes cuenta?{' '}
             <Text
               style={styles.loginLink}
-              onPress={() => router.push('/onboarding/auth')}
+              onPress={() => router.push('/onboarding/auth?mode=login')}
             >
               Inicia sesión
             </Text>
@@ -146,15 +150,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 32,
   },
-  logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2,
-    borderColor: `${COLORS.primary.DEFAULT}33`,
-    backgroundColor: `${COLORS.background.dark}80`,
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
+    width: 120,
+    height: 120,
   },
   bottomSection: {
     alignItems: 'center',

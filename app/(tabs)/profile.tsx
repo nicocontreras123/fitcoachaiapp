@@ -1,42 +1,29 @@
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
-import { Text, Switch, Surface, TextInput, Button } from 'react-native-paper';
-import { useTheme } from '@/hooks/useTheme';
+import { View, ScrollView, StyleSheet, Alert, Image, Pressable } from 'react-native';
+import { Text, Switch, Button } from 'react-native-paper';
 import { useUserStore } from '@/features/profile/store/userStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import { translateLevel } from '@/utils/translations';
-import React from 'react';
+import React, { useState } from 'react';
+import Constants from 'expo-constants';
+import { PrepTimeModal } from '@/features/profile/components/PrepTimeModal';
 
 export default function ProfileScreen() {
-  const { colors, isDark, toggleTheme } = useTheme();
   const { userData, updateUserData } = useUserStore();
   const { user, signOut } = useAuth();
   const router = useRouter();
 
-  const [prepMinutes, setPrepMinutes] = React.useState(
-    (userData?.prepTimeMinutes || 0).toString()
-  );
-  const [prepSeconds, setPrepSeconds] = React.useState(
-    (userData?.prepTimeSeconds !== undefined ? userData.prepTimeSeconds : 10).toString()
-  );
+  const [showPrepModal, setShowPrepModal] = useState(false);
 
-  const handleSaveTimerSettings = async () => {
-    const minutes = parseInt(prepMinutes) || 0;
-    const seconds = parseInt(prepSeconds) || 0;
+  // Legacy state removed, handled now by Modal
 
-    if (seconds >= 60) {
-      alert('Los segundos deben ser menores a 60');
-      return;
-    }
-
+  const handleSavePrepTime = async (minutes: number, seconds: number) => {
     await updateUserData({
       prepTimeMinutes: minutes,
       prepTimeSeconds: seconds,
     });
-
-    alert('Configuración guardada correctamente');
+    // Alert removed as requested
   };
 
   const handleLogout = () => {
@@ -62,196 +49,155 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={{ fontSize: 64, marginBottom: 16 }}>👤</Text>
-          <Text variant="headlineMedium" style={{ fontWeight: 'bold', marginBottom: 8, color: colors.textPrimary }}>
-            Perfil
-          </Text>
-          <Text variant="bodyMedium" style={{ textAlign: 'center', color: colors.textSecondary, marginBottom: 8 }}>
-            {userData?.name || 'Usuario'}
-          </Text>
-          {user?.email && (
-            <Text variant="bodySmall" style={{ textAlign: 'center', color: colors.textSecondary, marginBottom: 24 }}>
-              {user.email}
-            </Text>
-          )}
+    <SafeAreaView style={[styles.container, { backgroundColor: '#102216' }]}>
+      {/* Sticky Header */}
+      <View style={[styles.stickyHeader, { backgroundColor: 'rgba(16, 34, 22, 0.95)', borderColor: 'rgba(255,255,255,0.05)' }]}>
+        <View style={styles.headerContent}>
+          {/* Back button removed as requested */}
+          <Text style={[styles.headerTitle, { color: '#fff', flex: 1, textAlign: 'center' }]}>Mi Perfil</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+        {/* Profile Header section */}
+        <View style={styles.profileSection}>
+          <View style={styles.avatarWrapper}>
+            <View style={[styles.avatarContainer, { borderColor: '#152e1e' }]}>
+              {userData?.photoUrl ? (
+                <Image source={{ uri: userData.photoUrl }} style={styles.avatarImage} />
+              ) : (
+                <View style={[styles.avatarPlaceholder, { backgroundColor: '#1a1a1a' }]}>
+                  <MaterialCommunityIcons name="account" size={40} color="#fff" />
+                </View>
+              )}
+            </View>
+            <View style={[styles.editButton, { borderColor: '#102216' }]}>
+              <MaterialCommunityIcons name="pencil" size={14} color="#000" />
+            </View>
+          </View>
+
+          <View style={styles.userInfo}>
+            <Text style={[styles.userName, { color: '#fff' }]}>{userData?.name || 'Usuario'}</Text>
+            <Text style={[styles.userEmail, { color: '#9ca3af' }]}>{user?.email || 'usuario@email.com'}</Text>
+          </View>
+
+          {/* Stats Grid */}
+          <View style={styles.statsGrid}>
+            <View style={[styles.statCard, { backgroundColor: '#152e1e', borderColor: 'rgba(255,255,255,0.05)' }]}>
+              <Text style={styles.statLabel}>EDAD</Text>
+              <Text style={[styles.statValue, { color: '#fff' }]}>{userData?.age || '-'}</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: '#152e1e', borderColor: 'rgba(255,255,255,0.05)' }]}>
+              <Text style={styles.statLabel}>PESO</Text>
+              <Text style={[styles.statValue, { color: '#fff' }]}>
+                {userData?.weight || '-'} <Text style={styles.statUnit}>kg</Text>
+              </Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: '#152e1e', borderColor: 'rgba(255,255,255,0.05)' }]}>
+              <Text style={styles.statLabel}>ALTURA</Text>
+              <Text style={[styles.statValue, { color: '#fff' }]}>
+                {userData?.height || '-'} <Text style={styles.statUnit}>cm</Text>
+              </Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: '#152e1e', borderColor: 'rgba(255,255,255,0.05)' }]}>
+              <Text style={styles.statLabel}>NIVEL</Text>
+              <Text style={[styles.statValue, { color: '#13ec5b', fontSize: 14 }]}>
+                {userData?.level === 'advanced' ? 'Pro' : userData?.level === 'intermediate' ? 'Medio' : 'Inicio'}
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* Theme Switch */}
-        <Surface style={[styles.settingCard, { backgroundColor: colors.surface }]} elevation={1}>
-          <View style={styles.settingRow}>
-            <MaterialCommunityIcons name="theme-light-dark" size={24} color={colors.primary} />
-            <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: '600', flex: 1, marginLeft: 12 }}>
-              Modo Oscuro
-            </Text>
-            <Switch value={isDark} onValueChange={toggleTheme} color={colors.primary} />
-          </View>
-        </Surface>
+        {/* Settings Section */}
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionHeaderLabel}>AJUSTES DE APLICACIÓN</Text>
 
-        {/* Audio Settings */}
-        <Text variant="titleLarge" style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-          Configuración de Audio
-        </Text>
+          <View style={[styles.settingsContainer, { backgroundColor: '#152e1e', borderColor: 'rgba(255,255,255,0.05)' }]}>
 
-        {/* Voice Switch */}
-        <Surface style={[styles.settingCard, { backgroundColor: colors.surface }]} elevation={1}>
-          <View style={styles.settingRow}>
-            <MaterialCommunityIcons name="account-voice" size={24} color="#10b981" />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: '600' }}>
-                Anuncios de Voz
-              </Text>
-              <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 4 }}>
-                Escuchar instrucciones durante el entrenamiento
-              </Text>
-            </View>
-            <Switch
-              value={userData?.voiceEnabled !== false}
-              onValueChange={(value) => updateUserData({ voiceEnabled: value })}
-              color="#10b981"
-            />
-          </View>
-        </Surface>
+            {/* Dark Mode Toggle - Hidden as app is forced to dark mode */}
 
-        {/* Timer Sound Switch */}
-        <Surface style={[styles.settingCard, { backgroundColor: colors.surface }]} elevation={1}>
-          <View style={styles.settingRow}>
-            <MaterialCommunityIcons name="volume-high" size={24} color="#f59e0b" />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: '600' }}>
-                Sonidos del Timer
-              </Text>
-              <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 4 }}>
-                Reproducir sonidos de tick y campana
-              </Text>
-            </View>
-            <Switch
-              value={userData?.timerSoundEnabled !== false}
-              onValueChange={(value) => updateUserData({ timerSoundEnabled: value })}
-              color="#f59e0b"
-            />
-          </View>
-        </Surface>
-
-        {/* Timer Settings */}
-        <Text variant="titleLarge" style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-          Configuración del Timer
-        </Text>
-
-        <Surface style={[styles.settingCard, { backgroundColor: colors.surface }]} elevation={1}>
-          <View style={styles.settingHeader}>
-            <MaterialCommunityIcons name="timer" size={24} color="#fbbf24" />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: '600' }}>
-                Tiempo de Preparación
-              </Text>
-              <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 4 }}>
-                Tiempo antes de comenzar el primer round
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.timeInputs}>
-            <View style={styles.timeInputGroup}>
-              <TextInput
-                label="Minutos"
-                value={prepMinutes}
-                onChangeText={setPrepMinutes}
-                keyboardType="number-pad"
-                mode="outlined"
-                style={styles.timeInput}
-                maxLength={2}
+            {/* Voice Announcements */}
+            <View style={[styles.settingRow, { borderBottomColor: 'rgba(255,255,255,0.05)' }]}>
+              <View style={styles.settingLeft}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(19, 236, 91, 0.2)' }]}>
+                  <MaterialCommunityIcons name="account-voice" size={20} color="#13ec5b" />
+                </View>
+                <Text style={[styles.settingText, { color: '#fff' }]}>Anuncios de Voz</Text>
+              </View>
+              <Switch
+                value={userData?.voiceEnabled !== false}
+                onValueChange={(value) => updateUserData({ voiceEnabled: value })}
+                trackColor={{ false: '#767577', true: '#13ec5b' }}
+                thumbColor={'#fff'}
               />
-              <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 4, textAlign: 'center' }}>
-                min
-              </Text>
             </View>
 
-            <Text variant="headlineMedium" style={{ color: colors.textSecondary, marginHorizontal: 8 }}>
-              :
-            </Text>
-
-            <View style={styles.timeInputGroup}>
-              <TextInput
-                label="Segundos"
-                value={prepSeconds}
-                onChangeText={setPrepSeconds}
-                keyboardType="number-pad"
-                mode="outlined"
-                style={styles.timeInput}
-                maxLength={2}
+            {/* Timer Sounds */}
+            <View style={[styles.settingRow, { borderBottomColor: 'rgba(255,255,255,0.05)' }]}>
+              <View style={styles.settingLeft}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(19, 236, 91, 0.2)' }]}>
+                  <MaterialCommunityIcons name="volume-high" size={20} color="#13ec5b" />
+                </View>
+                <Text style={[styles.settingText, { color: '#fff' }]}>Sonidos del Timer</Text>
+              </View>
+              <Switch
+                value={userData?.timerSoundEnabled !== false}
+                onValueChange={(value) => updateUserData({ timerSoundEnabled: value })}
+                trackColor={{ false: '#767577', true: '#13ec5b' }}
+                thumbColor={'#fff'}
               />
-              <Text variant="bodySmall" style={{ color: colors.textSecondary, marginTop: 4, textAlign: 'center' }}>
-                seg
-              </Text>
             </View>
+
+            {/* Prep Time (Modal Trigger) */}
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => setShowPrepModal(true)}
+            >
+              <View style={styles.settingLeft}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(19, 236, 91, 0.2)' }]}>
+                  <MaterialCommunityIcons name="timer-sand" size={20} color="#13ec5b" />
+                </View>
+                <View>
+                  <Text style={[styles.settingText, { color: '#fff' }]}>Tiempo de Preparación</Text>
+                  <Text style={{ color: '#9ca3af', fontSize: 13, marginTop: 2 }}>
+                    {userData?.prepTimeMinutes || 0}m : {userData?.prepTimeSeconds || 10}s
+                  </Text>
+                </View>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={24} color="#4b5563" />
+            </Pressable>
+
           </View>
 
-          <Button
-            mode="contained"
-            onPress={handleSaveTimerSettings}
-            style={{ marginTop: 16 }}
-            icon="content-save"
-          >
-            Guardar Configuración
-          </Button>
-        </Surface>
-
-        {/* User Info */}
-        {userData && (
-          <Surface style={[styles.settingCard, { backgroundColor: colors.surface }]} elevation={1}>
-            <View style={styles.settingHeader}>
-              <MaterialCommunityIcons name="account" size={24} color={colors.primary} />
-              <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: '600', marginLeft: 12 }}>
-                Información Personal
-              </Text>
-            </View>
-
-            <View style={styles.infoGrid}>
-              <View style={styles.infoItem}>
-                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>Edad</Text>
-                <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: 'bold' }}>
-                  {userData.age} años
-                </Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>Peso</Text>
-                <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: 'bold' }}>
-                  {userData.weight} kg
-                </Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>Altura</Text>
-                <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: 'bold' }}>
-                  {userData.height} cm
-                </Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Text variant="bodySmall" style={{ color: colors.textSecondary }}>Nivel</Text>
-                <Text variant="titleMedium" style={{ color: colors.textPrimary, fontWeight: 'bold' }}>
-                  {translateLevel(userData.level)}
-                </Text>
-              </View>
-            </View>
-          </Surface>
-        )}
+        </View>
 
         {/* Logout Button */}
-        <Surface style={[styles.settingCard, { backgroundColor: colors.surface }]} elevation={1}>
+        <View style={{ marginTop: 32, paddingHorizontal: 16 }}>
           <Button
-            mode="outlined"
+            mode="contained"
             onPress={handleLogout}
-            contentStyle={{ height: 56 }}
-            labelStyle={{ fontSize: 16, fontWeight: '600', color: '#ef4444' }}
-            style={{ borderRadius: 28, borderColor: '#ef4444' }}
-            icon="logout"
+            contentStyle={{ height: 56, justifyContent: 'center' }}
+            labelStyle={{ fontSize: 16, fontWeight: '600', color: '#f87171' }}
+            style={{ borderRadius: 16, backgroundColor: 'rgba(239, 68, 68, 0.1)', elevation: 0 }}
+            icon={() => <MaterialCommunityIcons name="logout" size={20} color="#f87171" />}
           >
             Cerrar Sesión
           </Button>
-        </Surface>
+          <Text style={{ textAlign: 'center', color: '#4b5563', fontSize: 12, marginTop: 24 }}>
+            Versión {Constants.expoConfig?.version || '1.0.0'}
+          </Text>
+        </View>
+
+        <PrepTimeModal
+          visible={showPrepModal}
+          onClose={() => setShowPrepModal(false)}
+          onSave={handleSavePrepTime}
+          initialMinutes={userData?.prepTimeMinutes || 0}
+          initialSeconds={userData?.prepTimeSeconds || 10}
+        />
+
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -261,55 +207,162 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 16,
-    paddingTop: 60,
-    paddingBottom: 100,
+  stickyHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
   },
-  header: {
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: 'Lexend_700Bold', // Assuming fonts loaded
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  profileSection: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingHorizontal: 16,
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  avatarContainer: {
+    width: 112, // 28 * 4
+    height: 112,
+    borderRadius: 56,
+    overflow: 'hidden',
+    borderWidth: 4,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#13ec5b', // primary
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 4,
+  },
+  userInfo: {
     alignItems: 'center',
     marginBottom: 32,
   },
-  sectionTitle: {
-    fontWeight: 'bold',
-    marginTop: 24,
-    marginBottom: 12,
+  userName: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 4,
   },
-  settingCard: {
-    padding: 20,
+  userEmail: {
+    fontSize: 14,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
     borderRadius: 16,
-    marginBottom: 16,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#9ca3af', // gray-400
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statUnit: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#6b7280',
+  },
+  settingsSection: {
+    marginTop: 32,
+  },
+  sectionHeaderLabel: {
+    color: '#13ec5b',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 8,
+    paddingHorizontal: 24, // Matches HTML px-6
+    textTransform: 'uppercase',
+  },
+  settingsContainer: {
+    marginHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent', // Overridden inline
   },
-  settingHeader: {
+  settingLeft: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    gap: 16,
+    flex: 1,
   },
-  timeInputs: {
-    flexDirection: 'row',
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
   },
-  timeInputGroup: {
-    alignItems: 'center',
+  settingText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
-  timeInput: {
-    width: 100,
+  miniInput: {
+    fontSize: 14,
+    fontWeight: '400',
+    padding: 0,
+    minWidth: 20,
     textAlign: 'center',
-  },
-  infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginTop: 8,
-  },
-  infoItem: {
-    flex: 1,
-    minWidth: '45%',
+    backgroundColor: 'transparent',
   },
 });

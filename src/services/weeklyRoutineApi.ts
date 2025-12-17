@@ -31,7 +31,7 @@ export const weeklyRoutineApi = {
 
 
 
-      const response = await fetch(`${API_URL}/workouts/weekly-routines`, {
+      const response = await fetch(`${API_URL}/workout-templates/weekly-routines`, {
         method: 'POST',
         headers,
         body: JSON.stringify(routine),
@@ -66,7 +66,7 @@ export const weeklyRoutineApi = {
       throw new Error('NOT_AUTHENTICATED');
     }
 
-    const response = await fetch(`${API_URL}/workouts/weekly-routines`, {
+    const response = await fetch(`${API_URL}/workout-templates/weekly-routines`, {
       method: 'GET',
       headers,
     });
@@ -89,7 +89,7 @@ export const weeklyRoutineApi = {
 
 
 
-    const response = await fetch(`${API_URL}/workouts/weekly-routines/active`, {
+    const response = await fetch(`${API_URL}/workout-templates/weekly-routines/active`, {
       method: 'GET',
       headers,
     });
@@ -117,7 +117,7 @@ export const weeklyRoutineApi = {
       throw new Error('NOT_AUTHENTICATED');
     }
 
-    const response = await fetch(`${API_URL}/workouts/weekly-routines/${id}`, {
+    const response = await fetch(`${API_URL}/workout-templates/weekly-routines/${id}`, {
       method: 'GET',
       headers,
     });
@@ -138,7 +138,7 @@ export const weeklyRoutineApi = {
       throw new Error('NOT_AUTHENTICATED');
     }
 
-    const response = await fetch(`${API_URL}/workouts/weekly-routines/${id}`, {
+    const response = await fetch(`${API_URL}/workout-templates/weekly-routines/${id}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(updates),
@@ -160,7 +160,7 @@ export const weeklyRoutineApi = {
       throw new Error('NOT_AUTHENTICATED');
     }
 
-    const response = await fetch(`${API_URL}/workouts/weekly-routines/${id}`, {
+    const response = await fetch(`${API_URL}/workout-templates/weekly-routines/${id}`, {
       method: 'DELETE',
       headers,
     });
@@ -179,7 +179,7 @@ export const weeklyRoutineApi = {
       throw new Error('NOT_AUTHENTICATED');
     }
 
-    const response = await fetch(`${API_URL}/workouts/weekly-routines/${id}/set-active`, {
+    const response = await fetch(`${API_URL}/workout-templates/weekly-routines/${id}/set-active`, {
       method: 'PATCH',
       headers,
     });

@@ -19,6 +19,13 @@ export default function PersonalInfoScreen() {
   const [height, setHeight] = useState(formData.height?.toString() || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Form validation
+  const isFormValid =
+    name.trim().length >= 2 &&
+    age.trim().length > 0 && parseInt(age) >= 13 && parseInt(age) <= 100 &&
+    weight.trim().length > 0 && parseFloat(weight) >= 30 && parseFloat(weight) <= 300 &&
+    height.trim().length > 0 && parseFloat(height) >= 80 && parseFloat(height) <= 250;
+
   const handleContinue = () => {
     try {
       const data = {
@@ -95,7 +102,7 @@ export default function PersonalInfoScreen() {
             <LabeledInput
               label="Nombre"
               icon="account"
-              placeholder="e.g. Alex Smith"
+              placeholder="Ej: Alex Smith"
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
@@ -106,7 +113,7 @@ export default function PersonalInfoScreen() {
             <LabeledInput
               label="Edad"
               icon="cake"
-              placeholder="e.g. 25"
+              placeholder="Ej: 25"
               value={age}
               onChangeText={setAge}
               keyboardType="numeric"
@@ -117,7 +124,7 @@ export default function PersonalInfoScreen() {
             <LabeledInput
               label="Peso (kg)"
               icon="weight"
-              placeholder="e.g. 70"
+              placeholder="Ej: 70"
               value={weight}
               onChangeText={setWeight}
               keyboardType="decimal-pad"
@@ -128,7 +135,7 @@ export default function PersonalInfoScreen() {
             <LabeledInput
               label="Altura (cm)"
               icon="human-male-height"
-              placeholder="e.g. 175"
+              placeholder="Ej: 175"
               value={height}
               onChangeText={setHeight}
               keyboardType="numeric"
@@ -139,6 +146,7 @@ export default function PersonalInfoScreen() {
             <PrimaryButton
               onPress={handleContinue}
               icon="arrow-right"
+              disabled={!isFormValid}
             >
               CONTINUAR
             </PrimaryButton>
