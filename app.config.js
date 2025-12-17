@@ -30,7 +30,7 @@ module.exports = ({ config }) => ({
             backgroundColor: "#ffffff"
         },
         package: "com.fitcoach.ai",
-        googleServicesFile: "./android/src/google-services.json",
+        googleServicesFile: "./google-services.json",
         permissions: [
             "ACCESS_FINE_LOCATION",
             "ACCESS_COARSE_LOCATION",
