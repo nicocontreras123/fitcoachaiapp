@@ -93,16 +93,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     subtitle: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 10,
+        fontFamily: 'Lexend_700Bold',
         color: '#ec1313',
         textTransform: 'uppercase',
-        letterSpacing: 2,
+        letterSpacing: 3.2,
     },
     title: {
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'Lexend_700Bold',
         color: '#ffffff',
-        letterSpacing: 0.5,
+        letterSpacing: -0.4,
+        lineHeight: 20,
     },
 });

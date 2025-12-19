@@ -78,7 +78,7 @@ export default function DashboardScreen() {
         try {
           const workoutCompleted = await AsyncStorage.getItem('workout_just_completed');
           if (workoutCompleted === 'true') {
-            console.log('🔄 Workout completed, refreshing dashboard stats...');
+
             // Clear the flag
             await AsyncStorage.removeItem('workout_just_completed');
             // Refresh stats

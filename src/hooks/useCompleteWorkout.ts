@@ -50,7 +50,7 @@ export const useCompleteWorkout = () => {
             // Set flag to refresh dashboard stats when user returns
             if (saved) {
                 await AsyncStorage.setItem('workout_just_completed', 'true');
-                console.log('✅ Workout completed flag set');
+
             }
 
             return saved;

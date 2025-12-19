@@ -395,11 +395,11 @@ import { authService } from '@/services/firebase/auth';
 
 // Test sign up
 const user = await authService.signUpWithEmail('test@example.com', 'password123');
-console.log('User created:', user.uid);
+
 
 // Test sign in
 const signedInUser = await authService.signInWithEmail('test@example.com', 'password123');
-console.log('User signed in:', signedInUser.uid);
+
 ```
 
 ### 6.2 Probar Firestore
@@ -415,7 +415,7 @@ await firestoreService.createUser('user123', {
 
 // Test get user
 const userData = await firestoreService.getUser('user123');
-console.log('User data:', userData);
+
 ```
 
 ---

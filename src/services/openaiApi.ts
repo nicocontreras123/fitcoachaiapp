@@ -50,18 +50,18 @@ const EXERCISE_POOLS = {
       { name: 'Downward dog', duration: 60 },
     ],
     combinations: [
-      '1-1-2 (Jab-Jab-Cross)',
-      '1-2-3 (Jab-Cross-Hook)',
-      '2-3-2 (Cross-Hook-Cross)',
-      '1-2-3-2 (Jab-Cross-Hook-Cross)',
-      '1-6-3-2 (Jab-Uppercut-Hook-Cross)',
-      '3-2-3 (Hook-Cross-Hook)',
-      '1-1-2-3-2 (Jab-Jab-Jab-Cross-Cross)',
-      '4-3-2 (Uppercut-Hook-Cross)',
-      '1-1-3-Esquivar (Double jab + Cross + Esquivar)',
-      '1-2 + 1-2 + Slip + 3-2 (Jab-Cross-Jab-Cross + Slip + Hook-Cross)',
-      '1-2 + 1-2 + Slip + 3-2 + 1-2 (Jab-Cross-Jab-Cross + Slip + Hook-Cross + Jab-Cross)',
-      '1-2 + 1-2 + Slip + 3-2 + 1-2 + 1-2 (Jab-Cross-Jab-Cross + Slip + Hook-Cross + Jab-Cross + Jab-Cross)',
+      '1-1-2',
+      '1-2-3',
+      '2-3-2',
+      '1-2-3-2',
+      '1-6-3-2',
+      '3-2-3',
+      '1-1-2-3-2',
+      '4-3-2',
+      '1-1-3 + Esquivar',
+      '1-2 + Slip + 3-2',
+      '1-2-3 + Roll + 6-3',
+      '2-3-2 + Duck + 1-2',
     ],
     drills: [
       'Burpees con jab',
@@ -268,6 +268,18 @@ CRÍTICO - CÁLCULO DE DURACIÓN (paso a paso):
 5. totalDuration = warmupMin + roundsTotal - lastRest + cooldownMin
 6. REDONDEA al minuto más cercano
 
+NOMENCLATURA DE GOLPES DE BOXEO (OBLIGATORIO):
+Usa SOLO números para las combinaciones, NUNCA nombres de golpes:
+1 = Jab (directo delantero)
+2 = Cross (directo trasero)
+3 = Hook delantero
+4 = Hook trasero
+5 = Uppercut delantero
+6 = Uppercut trasero
+
+Ejemplos CORRECTOS: "1-2-3", "1-1-2", "2-3-2", "1-6-3-2"
+Ejemplos INCORRECTOS: "Jab-Cross-Hook", "JAB - CROSS - HOOK"
+
 BOXING formato:
 {
   "type": "boxing",
@@ -275,21 +287,66 @@ BOXING formato:
   "description": "Descripción específica",
   "totalDuration": NÚMERO_CALCULADO,
   "difficulty": "${level}",
-  "warmup": [{"name": "...", "duration": SEGUNDOS, "description": "..."}],
+  "warmup": [
+    {
+      "name": "[VARÍA EL EJERCICIO]",
+      "duration": SEGUNDOS,
+      "description": "[PROPÓSITO]. [INSTRUCCIONES TÉCNICAS DETALLADAS: postura, ritmo, respiración, repeticiones]. [CONSEJOS O PRECAUCIONES]. Progresión: [VARIACIÓN OPCIONAL]."
+    }
+  ],
   "rounds": [
     {
       "roundNumber": 1,
       "workTime": 180,
       "restTime": 60,
       "exercises": [
-        {"name": "${comboExample[0]}", "duration": 30, "description": "Técnica explosiva"},
-        {"name": "${comboExample[1]}", "duration": 30, "description": "Potencia"},
-        {"name": "Ejercicio físico", "duration": 40, "description": "Conditioning"}
+        {"name": "1-2-3", "duration": 30, "description": "Técnica y velocidad en combinación básica"},
+        {"name": "2-3-2", "duration": 30, "description": "Potencia con giro de cadera"},
+        {"name": "Burpees", "duration": 40, "description": "Explosividad y resistencia"},
+        {"name": "1-1-2-3-2", "duration": 30, "description": "Combo avanzado con doble jab"},
+        {"name": "High knees", "duration": 30, "description": "Activación cardiovascular"}
       ]
     }
   ],
-  "cooldown": [{"name": "...", "duration": SEGUNDOS, "description": "..."}]
+  "cooldown": [
+    {
+      "name": "[VARÍA EL EJERCICIO]",
+      "duration": SEGUNDOS,
+      "description": "[PROPÓSITO]. [INSTRUCCIONES TÉCNICAS DETALLADAS]. [CONSEJOS DE SEGURIDAD O TÉCNICA]."
+    }
+  ]
 }
+
+CRÍTICO - COMBINACIONES DE BOXEO:
+* USA SOLO NÚMEROS para las combinaciones de golpes (ej: "1-2-3", NO "Jab-Cross-Hook")
+* Mezcla combinaciones de golpes (1-2-3, etc.) con ejercicios físicos (Burpees, High knees, etc.)
+* Cada round debe tener 4-6 ejercicios diferentes
+* Varía las combinaciones entre rounds
+
+CRÍTICO - DESCRIPCIONES DE WARMUP/COOLDOWN:
+* GENERA EJERCICIOS ÚNICOS Y VARIADOS (NO copies ejemplos)
+* CADA descripción DEBE incluir en este orden:
+  1. PROPÓSITO: Qué sistema activa/recupera (ej: "Activación cardiovascular", "Movilidad de hombros", "Recuperación de tren inferior")
+  2. INSTRUCCIONES TÉCNICAS: Detalles específicos de ejecución
+     - Postura corporal exacta
+     - Ritmo, tempo o BPM si aplica
+     - Respiración (nasal/bucal, timing)
+     - Repeticiones o series específicas
+  3. CONSEJOS/PRECAUCIONES: Qué evitar o cómo optimizar
+  4. PROGRESIÓN (opcional): Cómo aumentar dificultad
+
+EJEMPLOS DE ESTRUCTURA (USA DIFERENTES EJERCICIOS):
+
+Warmup ejemplo:
+"Activación cardiovascular. [Instrucciones técnicas específicas del ejercicio elegido: posición, ritmo X-Y BPM, alternancia]. [Consejo técnico]. Progresión: [variación final]."
+
+Cooldown ejemplo:
+"Recuperación de [grupo muscular]. [Instrucciones: posición inicial, timing por lado, respiración]. [Precaución de seguridad]."
+
+* Longitud MÍNIMA: 2-3 frases completas (100-150 caracteres)
+* NUNCA descripciones de 1-2 palabras
+* Usa lenguaje profesional de entrenador
+* VARÍA los ejercicios entre workouts
 
 RUNNING formato:
 {
@@ -468,7 +525,7 @@ export class OpenAIService {
 
     // Usar nivel del userProfile con fallback a params.level
     const level = userProfile?.level || params.level || 'intermediate';
-    console.log(`🎯 Using level: ${level} (from ${userProfile?.level ? 'userProfile' : 'params'})`);
+
 
     const seed = getPromptVariationSeed(userProfile);
     const systemPrompt = generateVariedSystemPrompt(seed, sport, level);

@@ -9,8 +9,8 @@ module.exports = ({ config }) => ({
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
     splash: {
-        image: "./assets/splash.png",
-        resizeMode: "cover",
+        image: "./assets/fitcoach_logo.png",
+        resizeMode: "contain",
         backgroundColor: "#102216"
     },
     assetBundlePatterns: [
@@ -21,7 +21,8 @@ module.exports = ({ config }) => ({
         bundleIdentifier: "com.fitcoach.ai",
         infoPlist: {
             NSLocationWhenInUseUsageDescription: "FitCoach AI needs your location to track your running workouts and provide accurate distance and pace information.",
-            NSMicrophoneUsageDescription: "FitCoach AI needs microphone access to provide voice feedback during your workouts."
+            NSMicrophoneUsageDescription: "FitCoach AI needs microphone access to provide voice feedback during your workouts.",
+            LSApplicationQueriesSchemes: ["spotify"]
         }
     },
     android: {
@@ -54,7 +55,9 @@ module.exports = ({ config }) => ({
         "expo-font",
         "expo-web-browser",
         "expo-audio",
-        "expo-asset"
+        "expo-asset",
+        "@react-native-firebase/app",
+        "@react-native-firebase/crashlytics"
     ],
     scheme: "fitcoach",
     experiments: {

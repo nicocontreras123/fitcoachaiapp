@@ -26,8 +26,21 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
 
     const [timeLeft, setTimeLeft] = useState(initialTime);
     const [isActive, setIsActive] = useState(autoStart);
+    const [restartCounter, setRestartCounter] = useState(0); // Force interval recreation
     const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
     const hasCalledCountdownRef = useRef<Set<number>>(new Set());
+
+    // Store callbacks in refs to avoid dependency issues
+    const onCompleteRef = useRef(onComplete);
+    const onTickRef = useRef(onTick);
+    const onCountdownRef = useRef(onCountdown);
+
+    // Update refs when callbacks change
+    useEffect(() => {
+        onCompleteRef.current = onComplete;
+        onTickRef.current = onTick;
+        onCountdownRef.current = onCountdown;
+    }, [onComplete, onTick, onCountdown]);
 
     // Timestamp-based tracking for background support
     const startTimestampRef = useRef<number | null>(null);
@@ -46,14 +59,27 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
 
         // Initialize start timestamp if not set
         if (startTimestampRef.current === null) {
+            console.log('🚀 [PHASE_TIMER] Initializing interval', {
+                timeLeft,
+                totalDuration: totalDurationRef.current,
+                restartCounter
+            });
             startTimestampRef.current = Date.now();
-            totalDurationRef.current = timeLeft;
+            // totalDurationRef should already be set by setTimeAndStart or other methods
+            // Only use timeLeft as fallback if totalDurationRef is somehow 0
+            if (totalDurationRef.current === 0) {
+                console.warn('⚠️ [PHASE_TIMER] totalDurationRef was 0, using timeLeft:', timeLeft);
+                totalDurationRef.current = timeLeft;
+            }
         }
 
         // Don't recreate interval if already exists
         if (intervalRef.current) {
+
             return;
         }
+
+
 
         const calculateTimeLeft = () => {
             if (startTimestampRef.current === null) return timeLeft;
@@ -65,8 +91,15 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
 
         intervalRef.current = setInterval(() => {
             const newTime = calculateTimeLeft();
+            console.log('⏲️ [PHASE_TIMER] Interval tick', {
+                newTime,
+                totalDuration: totalDurationRef.current,
+                timestamp: startTimestampRef.current,
+                elapsed: startTimestampRef.current ? Math.floor((Date.now() - startTimestampRef.current) / 1000) : 0
+            });
 
             if (newTime <= 0) {
+
                 clearInterval(intervalRef.current!);
                 intervalRef.current = undefined;
                 startTimestampRef.current = null;
@@ -77,7 +110,7 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
             setTimeLeft(newTime);
 
             // Call onTick callback
-            onTick?.(newTime);
+            onTickRef.current?.(newTime);
 
             // Call countdown callback for 3, 2, 1
             if (
@@ -86,7 +119,7 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
                 !hasCalledCountdownRef.current.has(newTime)
             ) {
                 hasCalledCountdownRef.current.add(newTime);
-                onCountdown?.(newTime);
+                onCountdownRef.current?.(newTime);
             }
 
             // Reset countdown tracking when time > 3
@@ -101,7 +134,7 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
                 intervalRef.current = undefined;
             }
         };
-    }, [isActive]);
+    }, [isActive, restartCounter]);
 
     // AppState listener to sync when returning from background
     useEffect(() => {
@@ -119,13 +152,24 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
         };
     }, [isActive]);
 
-    // Handle completion
+    // Handle completion - use ref to avoid re-running when callback changes
     useEffect(() => {
-        if (timeLeft === 0 && isActive) {
+        console.log('🔍 [PHASE_TIMER] Completion check', {
+            timeLeft,
+            isActive,
+            hasTimestamp: startTimestampRef.current !== null,
+            willComplete: timeLeft === 0 && isActive && startTimestampRef.current === null
+        });
+        // Only complete if:
+        // 1. Time is 0
+        // 2. Timer is active
+        // 3. No timestamp (meaning interval already cleared it when naturally reaching 0)
+        if (timeLeft === 0 && isActive && startTimestampRef.current === null) {
+
             setIsActive(false);
-            onComplete?.();
+            onCompleteRef.current?.();
         }
-    }, [timeLeft, isActive, onComplete]);
+    }, [timeLeft, isActive]);
 
     // Control functions
     const start = useCallback(() => {
@@ -181,11 +225,22 @@ export const usePhaseTimer = (config: PhaseTimerConfig) => {
     }, [timeLeft]);
 
     const setTimeAndStart = useCallback((newTime: number) => {
+
+
+        // Clear existing interval if any
+        if (intervalRef.current) {
+
+            clearInterval(intervalRef.current);
+            intervalRef.current = undefined;
+        }
+
         setTimeLeft(newTime);
         startTimestampRef.current = Date.now();
         totalDurationRef.current = newTime;
         hasCalledCountdownRef.current.clear();
         setIsActive(true);
+        setRestartCounter(prev => prev + 1); // Force interval recreation
+
     }, []);
 
     return {

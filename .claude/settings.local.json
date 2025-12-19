@@ -13,7 +13,12 @@
       "Bash(keytool:*)",
       "Bash(cat:*)",
       "Bash(npx expo prebuild:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(npx expo install:*)",
+      "Bash(npx expo-doctor)",
+      "Bash(git rm:*)",
+      "Bash(npx tsc:*)",
+      "Bash(file:*)"
     ]
   }
 }

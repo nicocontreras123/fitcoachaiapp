@@ -84,20 +84,33 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
      */
     const speak = useCallback(
         (text: string, options?: any) => {
-            if (!voiceEnabled || !text || text === 'undefined') return;
+            console.log('🎤 [AUDIO] Speak called', {
+                text,
+                voiceEnabled,
+                textValid: !!text && text !== 'undefined',
+            });
+
+            if (!voiceEnabled || !text || text === 'undefined') {
+                console.log('⚠️ [AUDIO] Speak skipped', {
+                    reason: !voiceEnabled ? 'voice disabled' : 'invalid text',
+                });
+                return;
+            }
 
             try {
                 // Activar ducking cuando empieza a hablar
                 enableDucking();
                 isSpeakingRef.current = true;
 
+
                 Speech.speak(text, {
                     language,
-                    pitch: 0.8,        // Voz más grave (default: 1.0)
+                    pitch: 0.65,       // Voz mucho más grave (default: 1.0)
                     rate: 0.9,         // Ligeramente más lento para claridad
                     volume: 1.0,       // Volumen máximo para que se escuche sobre Spotify
                     ...options,
                     onDone: () => {
+
                         // Desactivar ducking cuando termina de hablar
                         isSpeakingRef.current = false;
                         // Solo desactivar si el tick tampoco está sonando
@@ -107,6 +120,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
                         options?.onDone?.();
                     },
                     onError: (error: any) => {
+                        console.error('❌ [AUDIO] Speech error:', error);
                         isSpeakingRef.current = false;
                         if (!isTickPlayingRef.current) {
                             disableDucking();
@@ -131,7 +145,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
     const speakCountdown = useCallback(
         (count: number) => {
             speak(count.toString(), {
-                pitch: 0.7,    // Más grave para énfasis
+                pitch: 0.65,   // Mismo tono grave que el resto
                 rate: 0.85,    // Pausado pero claro
             });
         },
@@ -156,7 +170,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
                 tickPlayer.volume = 1.0; // Volumen máximo para que se escuche sobre Spotify
                 tickPlayer.play();
                 isTickPlayingRef.current = true;
-                console.log('🔊 [AUDIO] Tick sound started - Spotify ducked');
+
             }
         } catch (error) {
             console.error('❌ [AUDIO] Error starting tick sound:', error);
@@ -184,7 +198,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
                     // Desactivar ducking solo si tampoco está hablando
                     if (!isSpeakingRef.current) {
                         disableDucking();
-                        console.log('🔇 [AUDIO] Tick sound stopped - Spotify restored');
+
                     }
                 }
             } catch (innerError: any) {
@@ -256,11 +270,22 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
      */
     const announceExercise = useCallback(
         (exerciseName: string, details?: string) => {
-            if (!exerciseName || exerciseName === 'undefined') return;
+            console.log('💪 [AUDIO] Announce exercise called', {
+                exerciseName,
+                details,
+                valid: !!exerciseName && exerciseName !== 'undefined',
+            });
+
+            if (!exerciseName || exerciseName === 'undefined') {
+
+                return;
+            }
 
             const message = details
                 ? `${exerciseName}, ${details}`
                 : exerciseName;
+
+
             speak(message);
         },
         [speak]
@@ -293,8 +318,8 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
         (roundNumber?: number) => {
             playBell();
             speak(roundNumber ? `Round ${roundNumber}, Inicia!` : 'Inicia!', {
-                pitch: 1.1,
-                rate: 0.9,
+                pitch: 0.65,   // Voz mucho más grave y autoritaria
+                rate: 0.85,    // Más lento para impacto
             });
         },
         [speak, playBell]
@@ -305,7 +330,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
      */
     const announceRest = useCallback(() => {
         speak('Descansa', {
-            pitch: 0.9,
+            pitch: 0.65,   // Mismo tono grave que el resto
             rate: 0.8,
         });
     }, [speak]);

@@ -1,0 +1,246 @@
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { formatTime } from '@/utils/timeUtils';
+import { ExerciseCard, BlurHeader } from '@/components/timer';
+import { TimerControls } from '../../shared';
+
+interface CooldownPhaseProps {
+    currentExercise: any;
+    nextExercise: string;
+    currentIndex: number;
+    totalExercises: number;
+    timeLeft: number;
+    totalTimeRemaining: number;
+    isPlaying: boolean;
+    isMuted: boolean;
+    onBack: () => void;
+    onMuteToggle: () => void;
+    onPlayPause: () => void;
+    onSkip: () => void;
+    onReset: () => void;
+    showSkipButton?: boolean;
+}
+
+export const CooldownPhase: React.FC<CooldownPhaseProps> = ({
+    currentExercise,
+    nextExercise,
+    currentIndex,
+    totalExercises,
+    timeLeft,
+    totalTimeRemaining,
+    isPlaying,
+    isMuted,
+    onBack,
+    onMuteToggle,
+    onPlayPause,
+    onSkip,
+    onReset,
+    showSkipButton = true,
+}) => {
+    return (
+        <SafeAreaView style={[styles.container, { backgroundColor: '#0f172a' }]} edges={['top', 'left', 'right']}>
+            <StatusBar hidden />
+            <BlurHeader
+                title="Enfriamiento"
+                onBack={onBack}
+                onMuteToggle={onMuteToggle}
+                isMuted={isMuted}
+                topBadge={
+                    <View style={styles.topTimeBadge}>
+                        <Text style={styles.topTimeText}>🕐 Total: {formatTime(totalTimeRemaining)}</Text>
+                    </View>
+                }
+            />
+
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Phase Title - New Design */}
+                <View style={styles.phaseIndicator}>
+                    <Text style={styles.phaseTitle}>COOL DOWN</Text>
+                    <View style={styles.phaseBadge}>
+                        <View style={[styles.pulseDot, { backgroundColor: '#2dd4bf' }]} />
+                        <Text style={[styles.phaseLabel, { color: '#2dd4bf' }]}>Recuperación</Text>
+                    </View>
+                </View>
+
+                {/* Timer Section - New Design */}
+                <View style={styles.timerSection}>
+                    {/* Background glow effect */}
+                    <View style={[styles.timerGlow, { backgroundColor: 'rgba(45, 212, 191, 0.1)' }]} />
+
+                    <View style={styles.timerContent}>
+                        <Text style={styles.timerDisplay}>
+                            {formatTime(timeLeft)}
+                        </Text>
+                        <View style={styles.timerLabel}>
+                            <Text style={styles.timerLabelIcon}>⏱</Text>
+                            <Text style={styles.timerLabelText}>Tiempo Restante</Text>
+                        </View>
+                    </View>
+                </View>
+
+                {currentExercise && (
+                    <ExerciseCard
+                        title={currentExercise.name}
+                        description={currentExercise.description}
+                        currentStep="Estiramiento Actual"
+                        colors={['#2dd4bf', '#0891b2']}
+                        totalSteps={totalExercises}
+                        currentStepIndex={currentIndex}
+                        animated={isPlaying}
+                    />
+                )}
+
+                <View style={styles.nextExercise}>
+                    <Text style={[styles.nextLabel, { color: '#2dd4bf' }]}>Siguiente</Text>
+                    <Text style={styles.nextText}>{nextExercise}</Text>
+                </View>
+            </ScrollView>
+
+            <View style={styles.controlsContainer}>
+                <TimerControls
+                    isPlaying={isPlaying}
+                    onPlayPause={onPlayPause}
+                    onSkip={onSkip}
+                    onReset={onReset}
+                    showSkipButton={showSkipButton}
+                    playButtonColor="#2dd4bf"
+                />
+            </View>
+        </SafeAreaView>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    content: {
+        flex: 1,
+    },
+    topTimeBadge: {
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+    },
+    topTimeText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#ffffff',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    // New Phase Indicator Styles
+    phaseIndicator: {
+        alignItems: 'center',
+        paddingTop: 16,
+        paddingBottom: 8,
+    },
+    phaseTitle: {
+        fontSize: 40,
+        fontFamily: 'Lexend_800ExtraBold',
+        color: '#ffffff',
+        letterSpacing: -1.2,
+        lineHeight: 40,
+        textAlign: 'center',
+    },
+    phaseBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 8,
+    },
+    pulseDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    phaseLabel: {
+        fontSize: 14,
+        fontFamily: 'Lexend_700Bold',
+        textTransform: 'uppercase',
+        letterSpacing: 1.5,
+    },
+    // New Timer Styles
+    timerSection: {
+        position: 'relative',
+        width: '100%',
+        paddingVertical: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    timerGlow: {
+        position: 'absolute',
+        width: '75%',
+        height: '75%',
+        borderRadius: 9999,
+        opacity: 0.5,
+    },
+    timerContent: {
+        zIndex: 10,
+        alignItems: 'center',
+    },
+    timerDisplay: {
+        fontSize: 100,
+        fontFamily: 'Lexend_800ExtraBold',
+        color: '#ffffff',
+        letterSpacing: -4,
+        lineHeight: 85,
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowOffset: { width: 0, height: 4 },
+        textShadowRadius: 12,
+    },
+    timerLabel: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    timerLabelIcon: {
+        fontSize: 16,
+        color: 'rgba(255, 255, 255, 0.6)',
+    },
+    timerLabelText: {
+        fontSize: 12,
+        fontFamily: 'Lexend_500Medium',
+        color: 'rgba(255, 255, 255, 0.6)',
+        textTransform: 'uppercase',
+        letterSpacing: 1.2,
+    },
+    nextExercise: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        marginTop: 8,
+        opacity: 0.6,
+    },
+    nextLabel: {
+        fontSize: 12,
+        fontFamily: 'Lexend_700Bold',
+        textTransform: 'uppercase',
+        letterSpacing: 1.2,
+    },
+    nextText: {
+        fontSize: 14,
+        fontFamily: 'Lexend_600SemiBold',
+        color: '#ffffff',
+        textAlign: 'right',
+        flex: 1,
+        marginLeft: 16,
+    },
+    controlsContainer: {
+        padding: 16,
+        paddingBottom: 32,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        gap: 16,
+    },
+});

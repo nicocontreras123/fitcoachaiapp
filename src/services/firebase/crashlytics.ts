@@ -13,7 +13,7 @@ export const crashlyticsService = {
         try {
             // Enable Crashlytics data collection
             await crashlytics().setCrashlyticsCollectionEnabled(true);
-            console.log('✅ Crashlytics initialized');
+
         } catch (error) {
             console.error('❌ Failed to initialize Crashlytics:', error);
         }
@@ -30,7 +30,7 @@ export const crashlyticsService = {
                 crashlytics().log(`Context: ${context}`);
             }
             crashlytics().recordError(error);
-            console.log('📊 Error recorded to Crashlytics:', error.message);
+
         } catch (e) {
             console.error('Failed to record error to Crashlytics:', e);
         }
@@ -52,7 +52,7 @@ export const crashlyticsService = {
     setUserId: (userId: string) => {
         try {
             crashlytics().setUserId(userId);
-            console.log('👤 User ID set for Crashlytics:', userId);
+
         } catch (error) {
             console.error('Failed to set user ID:', error);
         }
@@ -102,7 +102,7 @@ export const crashlyticsService = {
     setCrashlyticsCollectionEnabled: async (enabled: boolean) => {
         try {
             await crashlytics().setCrashlyticsCollectionEnabled(enabled);
-            console.log(`Crashlytics collection ${enabled ? 'enabled' : 'disabled'}`);
+
         } catch (error) {
             console.error('Failed to set crashlytics collection:', error);
         }

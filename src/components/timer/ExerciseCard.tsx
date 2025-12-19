@@ -57,13 +57,19 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
         outputRange: [`${colors[0]}1A`, `${colors[0]}66`],
     });
 
+    // Dynamic background color (very dark version of primary color)
+    // If primary is orange (#ff8c00), bg could be roughly #331A00
+    // If primary is red (#ec1313), bg could be roughly #330404
+    // For now, let us use a generic dark overlay or try to mix it
+    const dynamicBgColor = colors[0] === '#ff8c00' ? '#331a00' : '#330505';
+
     return (
         <Animated.View style={[styles.wrapper, animated && { backgroundColor: glowColor }]}>
-            <Surface style={styles.container} elevation={4}>
+            <Surface style={[styles.container, { backgroundColor: dynamicBgColor }]} elevation={4}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{currentStep || 'Combinación Actual'}</Text>
+                    <View style={[styles.badge, { backgroundColor: `${colors[0]}1A` }]}>
+                        <Text style={[styles.badgeText, { color: colors[0] }]}>{currentStep || 'Ejercicio Actual'}</Text>
                     </View>
                     {totalSteps && (
                         <View style={styles.dots}>
@@ -89,7 +95,7 @@ export const ExerciseCard: React.FC<ExerciseCardProps> = ({
                 <View style={styles.content}>
                     <View style={styles.textContent}>
                         {combinationTimeLeft !== undefined && (
-                            <Text style={styles.combinationTime}>
+                            <Text style={[styles.combinationTime, { color: colors[0] }]}>
                                 Tiempo combinación: {combinationTimeLeft}s
                             </Text>
                         )}
@@ -133,7 +139,7 @@ const styles = StyleSheet.create({
         padding: 2,
     },
     container: {
-        backgroundColor: '#331919',
+        // backgroundColor: '#331919', // Dynamic now
         borderRadius: 14,
         overflow: 'hidden',
         borderWidth: 1,
@@ -145,21 +151,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         padding: 16,
         paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+        // borderBottomWidth: 1, // Removed border
+        // borderBottomColor: 'rgba(255, 255, 255, 0.05)',
     },
     badge: {
-        backgroundColor: 'rgba(236, 19, 19, 0.1)',
+        // backgroundColor: dynamic
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 4,
     },
     badgeText: {
         fontSize: 10,
-        fontWeight: '700',
-        color: '#ec1313',
+        fontFamily: 'Lexend_700Bold',
+        // color: dynamic
         textTransform: 'uppercase',
-        letterSpacing: 1.5,
+        letterSpacing: 0.5,
     },
     dots: {
         flexDirection: 'row',
@@ -180,32 +186,34 @@ const styles = StyleSheet.create({
     textContent: {
         flex: 1,
         padding: 20,
+        paddingTop: 4, // Reduced padding top since header is closer
         gap: 8,
     },
     combinationTime: {
         fontSize: 12,
-        fontWeight: '700',
-        color: '#ec1313',
+        fontFamily: 'Lexend_700Bold',
+        // color: dynamic
         textTransform: 'uppercase',
         letterSpacing: 1,
     },
     title: {
-        fontSize: 24,
-        fontWeight: '900',
+        fontSize: 24, // Reduced from 30
+        fontFamily: 'Lexend_800ExtraBold', // font-black
         color: '#ffffff',
         textTransform: 'uppercase',
-        fontStyle: 'italic',
-        letterSpacing: 0.5,
+        // fontStyle: 'italic', // Removed to preserve ExtraBold weight
+        letterSpacing: -0.6, // tracking-tight
+        lineHeight: 28, // leading-tight
     },
     description: {
         fontSize: 14,
-        fontWeight: '500',
-        color: '#c99292',
+        fontFamily: 'Lexend_500Medium',
+        color: 'rgba(255, 255, 255, 0.7)', // white/70
         lineHeight: 20,
     },
     imageContainer: {
         width: 120,
-        height: 128,
+        height: 140, // Slightly taller
         backgroundColor: 'rgba(0, 0, 0, 0.2)',
         position: 'relative',
     },

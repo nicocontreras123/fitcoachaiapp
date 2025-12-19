@@ -14,6 +14,7 @@ interface TimerControlsProps {
     disablePrevious?: boolean;
     disableSkip?: boolean;
     disableReset?: boolean;
+    showSkipButton?: boolean;
 }
 
 export const TimerControls: React.FC<TimerControlsProps> = ({
@@ -28,6 +29,7 @@ export const TimerControls: React.FC<TimerControlsProps> = ({
     disablePrevious = false,
     disableSkip = false,
     disableReset = false,
+    showSkipButton = true,
 }) => {
     return (
         <View style={styles.container}>
@@ -88,7 +90,7 @@ export const TimerControls: React.FC<TimerControlsProps> = ({
                             color="#10b981"
                         />
                     </Pressable>
-                ) : onSkip ? (
+                ) : (showSkipButton && onSkip) ? (
                     <Pressable
                         style={styles.skipButton}
                         onPress={onSkip}

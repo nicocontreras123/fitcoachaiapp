@@ -29,7 +29,7 @@ if (!isConfigValid()) {
 let app: FirebaseApp;
 if (getApps().length === 0) {
     app = initializeApp(firebaseConfig);
-    console.log('✅ Firebase initialized successfully');
+
 } else {
     app = getApp();
 }

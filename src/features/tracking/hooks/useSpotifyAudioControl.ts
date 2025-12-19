@@ -28,7 +28,7 @@ export const useSpotifyAudioControl = () => {
                 interruptionModeAndroid: InterruptionModeAndroid.DuckOthers, // Baja el volumen de Spotify
             });
 
-            console.log('🎵 Audio session configured for Spotify ducking');
+
         } catch (error) {
             console.error('❌ Error configuring audio session:', error);
         }
@@ -49,7 +49,7 @@ export const useSpotifyAudioControl = () => {
                 interruptionModeIOS: InterruptionModeIOS.DuckOthers,
                 interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
             });
-            console.log('🔉 Ducking enabled - Spotify volume lowered');
+
         } catch (error) {
             console.error('❌ Error enabling ducking:', error);
         }
@@ -70,7 +70,7 @@ export const useSpotifyAudioControl = () => {
                 interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
                 interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
             });
-            console.log('🔊 Ducking disabled - Spotify volume restored');
+
         } catch (error) {
             console.error('❌ Error disabling ducking:', error);
         }
@@ -85,36 +85,33 @@ export const useSpotifyAudioControl = () => {
         const spotifyWebUrl = 'https://open.spotify.com';
 
         try {
-            const canOpen = await Linking.canOpenURL(spotifyAppUrl);
+            // Intentar abrir la app directamente
+            // Esto es más confiable en Android 11+ donde canOpenURL puede fallar falsamente
+            // si no están configuradas las queries en el manifiesto
+            await Linking.openURL(spotifyAppUrl);
 
-            if (canOpen) {
-                // Abrir app de Spotify
-                await Linking.openURL(spotifyAppUrl);
-                console.log('📱 Opened Spotify app');
-            } else {
-                // Si no tiene la app instalada, preguntar si quiere abrir la web
-                if (Platform.OS === 'web') {
-                    window.open(spotifyWebUrl, '_blank');
-                } else {
-                    Alert.alert(
-                        'Spotify no instalado',
-                        '¿Deseas abrir Spotify en el navegador?',
-                        [
-                            {
-                                text: 'Cancelar',
-                                style: 'cancel',
-                            },
-                            {
-                                text: 'Abrir',
-                                onPress: () => Linking.openURL(spotifyWebUrl),
-                            },
-                        ]
-                    );
-                }
-            }
         } catch (error) {
-            console.error('❌ Error opening Spotify:', error);
-            Alert.alert('Error', 'No se pudo abrir Spotify');
+
+
+            // Si falla abrir la app, ofrecer abrir la web
+            if (Platform.OS === 'web') {
+                Linking.openURL(spotifyWebUrl);
+            } else {
+                Alert.alert(
+                    'Spotify no detectado',
+                    'No pudimos abrir la app de Spotify directamente. ¿Deseas abrir la versión web?',
+                    [
+                        {
+                            text: 'Cancelar',
+                            style: 'cancel',
+                        },
+                        {
+                            text: 'Abrir Web',
+                            onPress: () => Linking.openURL(spotifyWebUrl),
+                        },
+                    ]
+                );
+            }
         }
     }, []);
 

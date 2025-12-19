@@ -57,18 +57,34 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
         loadProgress();
     }, []);
 
-    // Main timer loop
+    // Main timer loop - now includes preparing phase
     useEffect(() => {
-        if (state.phase === 'active' && !state.isPaused && state.timeLeft > 0) {
+        // Run timer during preparing AND active phases
+        if ((state.phase === 'preparing' || state.phase === 'active') && !state.isPaused && state.timeLeft > 0) {
             timerRef.current = setInterval(() => {
                 setState(prev => ({
                     ...prev,
                     timeLeft: prev.timeLeft - 1,
-                    totalElapsedTime: prev.totalElapsedTime + 1,
+                    // Only increment total elapsed time during active phase
+                    totalElapsedTime: prev.phase === 'active' ? prev.totalElapsedTime + 1 : prev.totalElapsedTime,
                 }));
             }, 1000);
-        } else if (state.timeLeft === 0 && state.phase === 'active') {
-            handleIntervalComplete();
+        } else if (state.timeLeft === 0) {
+            // Handle timeLeft reaching 0 in both preparing and active phases
+            if (state.phase === 'preparing') {
+                // Preparation finished, start first interval
+                const firstInterval = intervals[0];
+                setState(prev => ({
+                    ...prev,
+                    phase: 'active',
+                    currentIntervalIndex: 0,
+                    timeLeft: firstInterval.duration * 60,
+                }));
+                audio.playBell();
+                audio.speak('¡Comienza!');
+            } else if (state.phase === 'active') {
+                handleIntervalComplete();
+            }
         }
 
         return () => {
@@ -91,15 +107,15 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
         }
     }, [state.totalElapsedTime, autoSave]);
 
-    // Countdown announcements (3, 2, 1)
+    // Countdown announcements (3, 2, 1) - works during preparing and active phases
     useEffect(() => {
-        if (state.phase === 'active' && state.timeLeft <= 3 && state.timeLeft > 0) {
+        if ((state.phase === 'preparing' || state.phase === 'active') && !state.isPaused && state.timeLeft <= 3 && state.timeLeft > 0) {
             audio.speakCountdown(state.timeLeft);
             audio.startTickSound();
         } else {
             audio.stopTickSound();
         }
-    }, [state.timeLeft, state.phase]);
+    }, [state.timeLeft, state.phase, state.isPaused]);
 
     // Announce interval when starting
     useEffect(() => {
@@ -161,36 +177,29 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
         if (state.phase === 'idle') {
             // Start from preparation
             audio.speak('Prepárate para comenzar');
+
+            // Start GPS tracking
+            await gps.startTracking();
+
+            // Set preparing phase - timer will countdown automatically
             setState(prev => ({
                 ...prev,
                 phase: 'preparing',
                 timeLeft: prepTime,
             }));
 
-            // Start GPS tracking
-            await gps.startTracking();
-
-            // Auto-transition to first interval after prep time
-            setTimeout(() => {
-                const firstInterval = intervals[0];
-                setState(prev => ({
-                    ...prev,
-                    phase: 'active',
-                    currentIntervalIndex: 0,
-                    timeLeft: firstInterval.duration * 60,
-                }));
-                audio.playBell();
-                audio.speak('¡Comienza!');
-            }, prepTime * 1000);
+            // No need for setTimeout - the timer effect will handle the transition when timeLeft reaches 0
         }
     }, [state.phase, prepTime]);
 
     const pause = useCallback(() => {
-        if (state.phase === 'active' && !state.isPaused) {
+        if ((state.phase === 'preparing' || state.phase === 'active') && !state.isPaused) {
             setState(prev => ({ ...prev, isPaused: true }));
             audio.stopTickSound();
             audio.speak('Pausado');
-            saveProgress();
+            if (state.phase === 'active') {
+                saveProgress();
+            }
         }
     }, [state.phase, state.isPaused]);
 
@@ -260,7 +269,7 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
                 timestamp: Date.now(),
             };
             await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-            console.log('💾 Progress saved');
+
         } catch (error) {
             console.error('❌ Failed to save progress:', error);
         }
@@ -276,7 +285,7 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
                 // Only restore if less than 30 minutes old
                 if (timeSinceLastSave < 30 * 60 * 1000) {
                     setState(progress.state);
-                    console.log('📥 Progress restored');
+
                 } else {
                     await clearProgress();
                 }
@@ -289,7 +298,7 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
     const clearProgress = async () => {
         try {
             await AsyncStorage.removeItem(STORAGE_KEY);
-            console.log('🗑️ Progress cleared');
+
         } catch (error) {
             console.error('❌ Failed to clear progress:', error);
         }

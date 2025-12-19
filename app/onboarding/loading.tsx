@@ -177,7 +177,7 @@ export default function LoadingScreen() {
                 setCurrentPhase(LOADING_PHASES.length); // Última fase
                 setProgress(98);
 
-                console.log('💾 Saving user data with level:', userLevel);
+
 
                 await completeOnboarding({
                     name: formData.name || 'Usuario',

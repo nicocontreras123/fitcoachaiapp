@@ -264,7 +264,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
     // Cleanup: Stop all timers and audio when component unmounts
     useEffect(() => {
         return () => {
-            console.log('🧹 Cleaning up TimerGymNew - stopping all timers and audio');
+
 
             // Pause all timers
             preparationTimer.pause();
@@ -324,7 +324,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
 
         // Reset the ref when leaving warmup
         if (!isWarmup) {
-            console.log('🚪 [WARMUP_EFFECT] Leaving warmup, resetting ref');
+
             warmupInitializedRef.current = false;
         }
     }, [isWarmup, warmup]);
@@ -467,7 +467,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
             setTotalElapsedTime(prev => prev + timeLeftInCurrentWarmup);
 
             if (gymTimer.hasMoreWarmup) {
-                console.log('➡️ [SKIP] Moving to next warmup');
+
 
                 // Calculate next index BEFORE calling nextWarmup
                 const nextIndex = gymTimer.warmupIndex + 1;
@@ -496,7 +496,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                 phaseTimer.setTimeAndStart(nextWarmup?.duration || 300);
                 audio.announceExercise(nextWarmup?.name || nextWarmupRaw);
             } else {
-                console.log('✅ [SKIP] No more warmups, starting workout');
+
                 handleStartWorkout();
             }
         } else if (isCooldown) {
@@ -512,7 +512,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
 
             // Verificar ANTES de incrementar
             if (gymTimer.hasMoreCooldown) {
-                console.log('➡️ [SKIP] Moving to next cooldown');
+
 
                 // Calculate next index BEFORE calling nextCooldown
                 const nextIndex = gymTimer.cooldownIndex + 1;
@@ -541,7 +541,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
                 phaseTimer.setTimeAndStart(nextCooldown?.duration || 180);
                 audio.announceExercise(nextCooldown?.name || nextCooldownRaw);
             } else {
-                console.log('✅ [SKIP] No more cooldowns, finishing workout');
+
                 transitionTo('finished');
                 audio.announcePhaseTransition('cooldown', 'finished');
             }
