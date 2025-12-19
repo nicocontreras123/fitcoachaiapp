@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { Linking, Alert, Platform } from 'react-native';
 import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 
@@ -7,6 +7,8 @@ import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
  * Maneja el ducking de audio (bajar volumen de Spotify cuando suena el timer)
  */
 export const useSpotifyAudioControl = () => {
+    const isDuckingEnabledRef = useRef(false);
+
     // Configurar audio session para permitir audio en background y ducking
     useEffect(() => {
         configureAudioSession();
@@ -28,7 +30,7 @@ export const useSpotifyAudioControl = () => {
                 interruptionModeAndroid: InterruptionModeAndroid.DuckOthers, // Baja el volumen de Spotify
             });
 
-
+            isDuckingEnabledRef.current = true;
         } catch (error) {
             console.error('❌ Error configuring audio session:', error);
         }
@@ -37,8 +39,14 @@ export const useSpotifyAudioControl = () => {
     /**
      * Activa el ducking - baja el volumen de Spotify
      * Llamar cuando empiece a sonar el tick-tock o la voz
+     * OPTIMIZADO: Solo cambia el modo si no está ya activado
      */
     const enableDucking = useCallback(async () => {
+        // Si ya está activado, no hacer nada (evita pausas en Spotify)
+        if (isDuckingEnabledRef.current) {
+            return;
+        }
+
         try {
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: false,
@@ -50,6 +58,7 @@ export const useSpotifyAudioControl = () => {
                 interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
             });
 
+            isDuckingEnabledRef.current = true;
         } catch (error) {
             console.error('❌ Error enabling ducking:', error);
         }
@@ -58,8 +67,14 @@ export const useSpotifyAudioControl = () => {
     /**
      * Desactiva el ducking - vuelve el volumen normal de Spotify
      * Llamar cuando se detenga el tick-tock o la voz
+     * OPTIMIZADO: Solo cambia el modo si está activado
      */
     const disableDucking = useCallback(async () => {
+        // Si ya está desactivado, no hacer nada (evita pausas en Spotify)
+        if (!isDuckingEnabledRef.current) {
+            return;
+        }
+
         try {
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: false,
@@ -71,6 +86,7 @@ export const useSpotifyAudioControl = () => {
                 interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
             });
 
+            isDuckingEnabledRef.current = false;
         } catch (error) {
             console.error('❌ Error disabling ducking:', error);
         }

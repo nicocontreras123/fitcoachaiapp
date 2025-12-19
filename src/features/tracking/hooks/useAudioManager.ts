@@ -110,30 +110,20 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
                     volume: 1.0,       // Volumen máximo para que se escuche sobre Spotify
                     ...options,
                     onDone: () => {
-
-                        // Desactivar ducking cuando termina de hablar
                         isSpeakingRef.current = false;
-                        // Solo desactivar si el tick tampoco está sonando
-                        if (!isTickPlayingRef.current) {
-                            disableDucking();
-                        }
+                        // OPTIMIZACIÓN: No desactivar ducking para evitar pausas en Spotify
+                        // El ducking se mantiene activo durante todo el entrenamiento
                         options?.onDone?.();
                     },
                     onError: (error: any) => {
                         console.error('❌ [AUDIO] Speech error:', error);
                         isSpeakingRef.current = false;
-                        if (!isTickPlayingRef.current) {
-                            disableDucking();
-                        }
                         options?.onError?.(error);
                     },
                 });
             } catch (error) {
                 console.error('❌ [AUDIO] Error speaking:', error);
                 isSpeakingRef.current = false;
-                if (!isTickPlayingRef.current) {
-                    disableDucking();
-                }
             }
         },
         [voiceEnabled, language, enableDucking, disableDucking]
@@ -179,7 +169,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
 
     /**
      * Stop tick-tack sound
-     * Disables ducking to restore Spotify volume (if not speaking)
+     * NOTA: Mantiene el ducking activo para evitar pausas en Spotify
      */
     const stopTickSound = useCallback(() => {
         if (!tickPlayer) {
@@ -195,21 +185,15 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
                     tickPlayer.pause();
                     isTickPlayingRef.current = false;
 
-                    // Desactivar ducking solo si tampoco está hablando
-                    if (!isSpeakingRef.current) {
-                        disableDucking();
-
-                    }
+                    // OPTIMIZACIÓN: No desactivar ducking durante el entrenamiento
+                    // Mantenerlo activo evita pausas constantes en Spotify
+                    // El ducking se maneja automáticamente por el sistema de audio
                 }
             } catch (innerError: any) {
                 // If the player is already released, we can assume it's stopped and ignore the error
                 if (innerError?.message?.includes('already released') ||
                     innerError?.message?.includes('received class java.lang.Integer')) {
                     isTickPlayingRef.current = false;
-                    // Still try to disable ducking if needed
-                    if (!isSpeakingRef.current) {
-                        disableDucking();
-                    }
                     return;
                 }
                 throw innerError;
@@ -217,7 +201,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
         } catch (error) {
             console.error('❌ [AUDIO] Error stopping tick sound:', error);
         }
-    }, [tickPlayer, disableDucking]);
+    }, [tickPlayer]);
 
     /**
      * Play bell sound
