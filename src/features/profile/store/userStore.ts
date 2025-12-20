@@ -23,11 +23,26 @@ export const useUserStore = create<UserStore>((set, get) => ({
     try {
       set({ isLoading: true });
 
-      // Try to load from API first if user is authenticated
+      // ESTRATEGIA: Cargar datos locales primero para UX rápida,
+      // luego intentar sincronizar con API en segundo plano
+      const localUserData = await StorageService.getItem<UserData>(STORAGE_KEYS.USER_DATA);
+
+      // Si hay datos locales, establecerlos inmediatamente
+      if (localUserData) {
+        console.log('📦 [USER_STORE] Loaded user data from local cache');
+        set({
+          userData: localUserData,
+          hasCompletedOnboarding: localUserData.hasCompletedOnboarding ?? false,
+          isLoading: false,
+        });
+      }
+
+      // Intentar sincronizar con API (en background si ya tenemos datos locales)
       try {
         const backendUser = await api.getCurrentUser();
 
         if (backendUser) {
+          console.log('🔄 [USER_STORE] Syncing user data from API');
           const userData: UserData = {
             name: backendUser.name,
             age: backendUser.age,
@@ -46,34 +61,27 @@ export const useUserStore = create<UserStore>((set, get) => ({
             hasCompletedOnboarding: backendUser.hasCompletedOnboarding ?? false,
           };
 
-          // Cache locally
+          // Actualizar cache local
           await StorageService.setItem(STORAGE_KEYS.USER_DATA, userData);
 
+          // Actualizar estado (solo si los datos cambiaron)
           set({
             userData,
             hasCompletedOnboarding: backendUser.hasCompletedOnboarding ?? false,
             isLoading: false,
           });
-          return;
         }
-      } catch (apiError) {
+      } catch (apiError: any) {
+        console.warn('⚠️ [USER_STORE] API sync failed, using cached data:', apiError.message);
 
-      }
-
-      // Fallback to local storage
-      const userData = await StorageService.getItem<UserData>(STORAGE_KEYS.USER_DATA);
-
-      if (userData) {
-        set({
-          userData,
-          hasCompletedOnboarding: userData.hasCompletedOnboarding ?? false,
-          isLoading: false,
-        });
-      } else {
-        set({ isLoading: false });
+        // Si falló la API pero NO teníamos datos locales, establecer loading false
+        if (!localUserData) {
+          set({ isLoading: false });
+        }
+        // Si ya teníamos datos locales, ya establecimos isLoading: false arriba
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('❌ [USER_STORE] Error loading user data:', error);
       set({ isLoading: false });
     }
   },

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-type Phase = 'warmup' | 'workout' | 'cooldown' | 'finished';
+type Phase = 'preview' | 'warmup' | 'workout' | 'cooldown' | 'finished';
 
 /**
  * Hook to manage all timer control handlers
@@ -126,14 +126,20 @@ export const useTimerControls = ({
     ]);
 
     const handleResetRoutine = useCallback(() => {
-        resetPhase();
+        console.log('🔄 [RESET] handleResetRoutine called');
+
+        // Reset all timers and indices
         resetTimer();
         phaseTimer.reset();
         resetIndices();
         setUserHasStarted(false);
         resetExerciseIndex();
-        transitionTo('warmup');
-    }, [resetPhase, resetTimer, phaseTimer, resetIndices, transitionTo, setUserHasStarted, resetExerciseIndex]);
+
+        // Transition to preview screen (don't call resetPhase as it goes to 'idle')
+        console.log('🔄 [RESET] Transitioning to preview...');
+        transitionTo('preview');
+        console.log('🔄 [RESET] Transition called');
+    }, [resetTimer, phaseTimer, resetIndices, transitionTo, setUserHasStarted, resetExerciseIndex]);
 
     const handleBack = useCallback(() => {
         router.back();

@@ -123,11 +123,26 @@ export const WorkoutPhase: React.FC<WorkoutPhaseProps> = ({
                     </Animated.View>
                 )}
 
-                {(isPreparing || isRest) && (
+                {isPreparing && (
                     <View style={styles.messageContainer}>
-                        <Text style={styles.messageText}>
-                            {isPreparing ? 'El entrenamiento comenzará pronto' : 'Respira profundo y recupérate'}
+                        <Text style={styles.messageText}>El entrenamiento comenzará pronto</Text>
+                    </View>
+                )}
+
+                {isRest && (
+                    <View style={styles.nextRoundContainer}>
+                        <Text style={[styles.nextRoundTitle, { color: phaseColors.primary }]}>
+                            Siguiente Round
                         </Text>
+                        <Text style={styles.nextRoundSubtitle}>Prepárate para estos ejercicios</Text>
+                        <View style={styles.exercisesList}>
+                            {exercises.map((exercise, index) => (
+                                <View key={index} style={styles.exerciseItem}>
+                                    <View style={[styles.exerciseDot, { backgroundColor: phaseColors.primary }]} />
+                                    <Text style={styles.exerciseItemText}>{exercise.name}</Text>
+                                </View>
+                            ))}
+                        </View>
                     </View>
                 )}
 
@@ -316,5 +331,45 @@ const styles = StyleSheet.create({
         paddingBottom: 32,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         gap: 16,
+    },
+    nextRoundContainer: {
+        padding: 24,
+        marginHorizontal: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    nextRoundTitle: {
+        fontSize: 20,
+        fontFamily: 'Lexend_700Bold',
+        textAlign: 'center',
+        marginBottom: 4,
+    },
+    nextRoundSubtitle: {
+        fontSize: 14,
+        fontFamily: 'Lexend_400Regular',
+        color: 'rgba(255, 255, 255, 0.6)',
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    exercisesList: {
+        gap: 12,
+    },
+    exerciseItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    exerciseDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    exerciseItemText: {
+        fontSize: 16,
+        fontFamily: 'Lexend_500Medium',
+        color: '#ffffff',
+        flex: 1,
     },
 });

@@ -91,19 +91,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuthStatus = async () => {
     try {
       const token = await authApi.getToken();
+      console.log('🔐 [AUTH] Checking auth status, token exists:', !!token);
 
       if (token) {
-        const { api } = await import('@/services/api');
-        const userData = await api.getCurrentUser();
-        setUser(userData);
+        try {
+          const { api } = await import('@/services/api');
+          const userData = await api.getCurrentUser();
+          console.log('✅ [AUTH] User data loaded from API:', userData?.email);
+          setUser(userData);
 
-        // Sincronizar userStore después de cargar el usuario
-        const { useUserStore } = await import('@/features/profile/store/userStore');
-        await useUserStore.getState().loadUserData();
+          // Sincronizar userStore después de cargar el usuario
+          const { useUserStore } = await import('@/features/profile/store/userStore');
+          await useUserStore.getState().loadUserData();
+        } catch (apiError: any) {
+          console.error('⚠️ [AUTH] API call failed but token exists:', apiError.message);
+
+          // Si la API falla pero tenemos token, intentar cargar datos locales
+          // Esto mantiene al usuario logueado aunque la API no esté disponible
+          try {
+            const { useUserStore } = await import('@/features/profile/store/userStore');
+            const { userData } = useUserStore.getState();
+
+            if (userData && userData.hasCompletedOnboarding) {
+              console.log('ℹ️ [AUTH] Using cached user data, keeping user logged in');
+              // Crear un objeto user básico desde userData local
+              setUser({
+                id: 'cached',
+                email: userData.name || 'Usuario',
+                name: userData.name
+              });
+              await useUserStore.getState().loadUserData();
+            } else {
+              // Si no hay datos locales o no completó onboarding, cerrar sesión
+              console.warn('⚠️ [AUTH] No cached data found, logging out');
+              await authApi.removeToken();
+              setUser(null);
+            }
+          } catch (localError) {
+            console.error('❌ [AUTH] Failed to load local data:', localError);
+            // Solo limpiar el token si es un error de autenticación (401, 403)
+            if (apiError.message?.includes('401') || apiError.message?.includes('403') || apiError.message?.includes('Unauthorized')) {
+              console.log('🚪 [AUTH] Token invalid, logging out');
+              await authApi.removeToken();
+              setUser(null);
+            } else {
+              // Otros errores (red, servidor caído, etc.) - mantener sesión
+              console.log('⏳ [AUTH] Network/server error, keeping token for retry');
+            }
+          }
+        }
+      } else {
+        console.log('ℹ️ [AUTH] No token found, user needs to login');
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
-      await authApi.removeToken();
+      console.error('❌ [AUTH] Critical error in checkAuthStatus:', error);
       setUser(null);
     } finally {
       setLoading(false);

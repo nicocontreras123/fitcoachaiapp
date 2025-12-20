@@ -19,6 +19,7 @@ interface CooldownPhaseProps {
     onPlayPause: () => void;
     onSkip: () => void;
     onReset: () => void;
+    onComplete?: () => void;
     showSkipButton?: boolean;
 }
 
@@ -36,8 +37,18 @@ export const CooldownPhase: React.FC<CooldownPhaseProps> = ({
     onPlayPause,
     onSkip,
     onReset,
+    onComplete,
     showSkipButton = true,
 }) => {
+    const isLastExercise = currentIndex === totalExercises - 1;
+    console.log('❄️ [COOLDOWN] Rendering CooldownPhase', {
+        currentIndex,
+        totalExercises,
+        isLastExercise,
+        showSkipButton,
+        hasOnComplete: !!onComplete,
+    });
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: '#0f172a' }]} edges={['top', 'left', 'right']}>
             <StatusBar hidden />
@@ -103,7 +114,8 @@ export const CooldownPhase: React.FC<CooldownPhaseProps> = ({
                     onPlayPause={onPlayPause}
                     onSkip={onSkip}
                     onReset={onReset}
-                    showSkipButton={showSkipButton}
+                    onComplete={currentIndex === totalExercises - 1 ? onComplete : undefined}
+                    showSkipButton={showSkipButton && currentIndex < totalExercises - 1}
                     playButtonColor="#2dd4bf"
                 />
             </View>

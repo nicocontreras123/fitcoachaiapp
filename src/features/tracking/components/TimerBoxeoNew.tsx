@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useWorkoutStore } from '@/features/workouts/store/useWorkoutStore';
 import { useUserStore } from '@/features/profile/store/userStore';
 import { useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCompleteWorkout } from '@/hooks/useCompleteWorkout';
+import { PhaseTransition } from '@/components/transitions';
 
 // Hooks
 import { useBoxeoTimer } from '../hooks/useBoxeoTimer';
@@ -25,14 +26,16 @@ import {
 import { SpotifyButton } from './shared';
 import { WarmupPhase, WorkoutPhase, CooldownPhase, FinishedPhase } from './boxing/phases';
 import { SkipConfirmationDialog } from './boxing/components';
+import { PrepTimerScreen } from './PrepTimerScreen';
+import { WorkoutCompletedModal } from '@/features/history/WorkoutCompletedModal';
 
 // Utils
 import { calculateTotalTimeRemaining, getPhaseColors } from './boxing/utils';
 
 // 🔧 DEBUG MODE - Set to true to reduce all timers for faster testing
 const DEBUG_MODE = false; // ← Production mode
-const DEBUG_EXERCISE_DURATION = 10; // seconds per exercise in debug mode
-const DEBUG_PREP_TIME = 3; // seconds for preparation in debug mode
+const DEBUG_EXERCISE_DURATION = 5; // seconds per exercise in debug mode
+const DEBUG_PREP_TIME = 5; // seconds for preparation in debug mode
 
 interface TimerBoxeoProps {
     sessionId?: string;
@@ -83,19 +86,57 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
     const prepSeconds = userData?.prepTimeSeconds !== undefined ? userData.prepTimeSeconds : 10;
     const prepTimeInSeconds = DEBUG_MODE ? DEBUG_PREP_TIME : (prepMinutes * 60 + prepSeconds);
 
+    // Routine preview data for PrepTimerScreen
+    const routinePreview = useMemo(() => {
+        // Flatten all exercises from all rounds
+        const allWorkoutExercises: Array<{ name: string; description: string; rounds: string }> = [];
+
+        workoutRounds?.forEach((round: any) => {
+            round.exercises.forEach((exercise: any) => {
+                allWorkoutExercises.push({
+                    name: exercise.name,
+                    description: exercise.description || `Round ${round.roundNumber} • ${exercise.duration || 30}s`,
+                    rounds: `R${round.roundNumber}`,
+                });
+            });
+        });
+
+        console.log('📋 [PREP_TIMER] Total workout exercises:', allWorkoutExercises.length);
+        console.log('📋 [PREP_TIMER] First 5 exercises:', allWorkoutExercises.slice(0, 5).map(e => e.name));
+
+        return {
+            warmup: warmup.map((ex: any) => ({
+                name: ex.name,
+                duration: ex.duration || 300,
+                description: ex.description,
+            })),
+            workout: allWorkoutExercises,
+            cooldown: cooldown.map((ex: any) => ({
+                name: ex.name,
+                duration: ex.duration || 180,
+                description: ex.description,
+            })),
+            stats: {
+                duration: `${currentWorkout?.totalDuration || 45} min`,
+                intensity: currentWorkout?.intensity || 'Alta',
+                rounds: `${workoutRounds?.length || 12}`,
+            },
+        };
+    }, [warmup, workoutRounds, cooldown, currentWorkout]);
+
     // State
     const [isSoundMuted, setIsSoundMuted] = useState(false);
     const [userHasStarted, setUserHasStarted] = useState(false);
-    const [showSuccessAlert, setShowSuccessAlert] = useState(false);
     const [showCompletedModal, setShowCompletedModal] = useState(false);
     const [totalElapsedTime, setTotalElapsedTime] = useState(0);
 
-    // Phase management
-    const { phase, transitionTo, reset: resetPhase, isWarmup, isWorkout, isCooldown, isFinished } = useTimerStateMachine('warmup');
+    // Debug: log elapsed time changes
+    useEffect(() => {
+        console.log('⏱️ [ELAPSED_TIME] Changed:', totalElapsedTime);
+    }, [totalElapsedTime]);
 
-    // Phase transition animation
-    const [phaseTransitionAnim] = useState(new Animated.Value(1));
-    const previousPhaseRef = useRef(phase);
+    // Phase management
+    const { phase, transitionTo, reset: resetPhase, isPreview, isWarmup, isWorkout, isCooldown, isFinished } = useTimerStateMachine('preview');
 
     // Audio
     const audio = useAudioManager({
@@ -141,6 +182,7 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
     const {
         warmupIndex,
         cooldownIndex,
+        isPostWarmupRest,
         setWarmupIndex,
         setCooldownIndex,
         handlePhaseComplete,
@@ -268,22 +310,50 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
         }
     }, [userHasStarted, resetSkipCounter]);
 
-    // Track elapsed time
+    // Track elapsed time - count all active time (warmup, workout, cooldown)
     useEffect(() => {
         let intervalId: ReturnType<typeof setInterval>;
-        if (isActive && !isPreparing && isWorkout) {
-            intervalId = setInterval(() => setTotalElapsedTime(prev => prev + 1), 1000);
+        const shouldCount = (isWarmup && phaseTimer.isActive) || (isWorkout && isActive && !isPreparing) || (isCooldown && phaseTimer.isActive);
+
+        console.log('⏱️ [TIME_TRACKER] State changed', {
+            isWarmup,
+            isWorkout,
+            isCooldown,
+            phaseTimerActive: phaseTimer.isActive,
+            workoutActive: isActive,
+            isPreparing,
+            shouldCount,
+            currentTime: totalElapsedTime,
+        });
+
+        if (shouldCount) {
+            console.log('⏱️ [TIME_TRACKER] ✅ Starting interval timer');
+            intervalId = setInterval(() => {
+                setTotalElapsedTime(prev => {
+                    const newTime = prev + 1;
+                    if (newTime % 5 === 0) { // Log every 5 seconds
+                        console.log('⏱️ [TIME_TRACKER] Tick:', newTime);
+                    }
+                    return newTime;
+                });
+            }, 1000);
+        } else {
+            console.log('⏱️ [TIME_TRACKER] ❌ Not counting');
         }
+
         return () => {
-            if (intervalId) clearInterval(intervalId);
+            if (intervalId) {
+                console.log('⏱️ [TIME_TRACKER] Clearing interval');
+                clearInterval(intervalId);
+            }
         };
-    }, [isActive, isPreparing, isWorkout]);
+    }, [isWarmup, isWorkout, isCooldown, phaseTimer.isActive, isActive, isPreparing]);
 
     // Show modal when finished
     useEffect(() => {
-
+        console.log('🎯 [MODAL] isFinished changed:', isFinished);
         if (isFinished) {
-
+            console.log('🎯 [MODAL] Setting showCompletedModal to true');
             setShowCompletedModal(true);
         }
     }, [isFinished]);
@@ -299,27 +369,6 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
         return () => audio.stopTickSound();
     }, [isWarmup, isWorkout, phaseTimer.isActive, isActive, isPreparing, isRest, audio]);
 
-    // Phase transition animation
-    useEffect(() => {
-        if (previousPhaseRef.current !== phase) {
-            // Fade out
-            Animated.timing(phaseTransitionAnim, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-            }).start(() => {
-                // Update phase reference
-                previousPhaseRef.current = phase;
-
-                // Fade in
-                Animated.timing(phaseTransitionAnim, {
-                    toValue: 1,
-                    duration: 400,
-                    useNativeDriver: true,
-                }).start();
-            });
-        }
-    }, [phase, phaseTransitionAnim]);
 
     // Keep screen awake
     useKeepAwake();
@@ -331,12 +380,13 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
         }
     }, [totalElapsedTime, onTimeUpdate]);
 
-    // Call onComplete callback when finished
-    useEffect(() => {
-        if (onComplete && isFinished) {
-            onComplete();
-        }
-    }, [isFinished, onComplete]);
+    // Call onComplete callback when finished - DISABLED: Was causing navigation before modal shows
+    // useEffect(() => {
+    //     if (onComplete && isFinished) {
+    //         console.log('🚨 [ON_COMPLETE] onComplete callback being called!', { onComplete: !!onComplete, isFinished });
+    //         onComplete();
+    //     }
+    // }, [isFinished, onComplete]);
 
     // Calculate total time remaining
     const totalTimeRemaining = useMemo(() => {
@@ -371,21 +421,53 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
             }, notes);
             await AsyncStorage.removeItem('@dashboard_stats');
             setShowCompletedModal(false);
-            setShowSuccessAlert(true);
+            console.log('💾 [SAVE] Workout saved successfully');
         },
         [completeWorkout, totalElapsedTime, currentWorkout, round]
     );
 
     // Render phase content
     const renderContent = () => {
+        console.log('🎬 [RENDER] Current phase:', phase, '| isPreview:', isPreview, '| isWarmup:', isWarmup, '| isWorkout:', isWorkout);
+
+        // PREVIEW PHASE
+        if (isPreview) {
+            return (
+                <PrepTimerScreen
+                    exerciseName={currentWorkout?.title || 'Entrenamiento de Boxeo'}
+                    timerType="boxing"
+                    routinePreview={routinePreview}
+                    onStart={() => {
+                        if (warmup.length > 0) {
+                            transitionTo('warmup');
+                            if (prepTimeInSeconds > 0) {
+                                toggleTimer(); // Start prep timer
+                            }
+                        } else {
+                            transitionTo('workout');
+                            toggleTimer();
+                        }
+                    }}
+                    onBack={() => router.back()}
+                    onEdit={() => router.push('/(tabs)/rutinas')}
+                />
+            );
+        }
+
         if (isWarmup && (isPreparing || warmup.length > 0)) {
+            const nextEx = isPreparing
+                ? warmup[0]?.name
+                : isPostWarmupRest
+                    ? 'Entrenamiento Principal'
+                    : warmup[warmupIndex + 1]?.name || 'Entrenamiento Principal';
+
             return (
                 <WarmupPhase
                     isPreparing={isPreparing}
+                    isPostWarmupRest={isPostWarmupRest}
                     displayTime={isPreparing ? timeLeft : phaseTimer.timeLeft || warmup[0]?.duration || 300}
-
                     currentExercise={warmup[warmupIndex]}
-                    nextExercise={warmup[warmupIndex + 1]?.name || 'Entrenamiento Principal'}
+                    nextExercise={nextEx}
                     phaseColors={phaseColors}
                     totalTimeRemaining={totalTimeRemaining}
                     isPlaying={isPreparing ? isActive : phaseTimer.isActive}
@@ -417,27 +499,46 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                     onSkip={handleSkipPress}
                     showSkipButton={canSkip}
                     onReset={handleResetRoutine}
+                    onComplete={() => {
+                        console.log('🏁 [COMPLETE] Complete button pressed');
+                        console.log('🏁 [COMPLETE] Current state:', {
+                            phase,
+                            cooldownIndex,
+                            totalCooldown: cooldown.length,
+                            isFinished,
+                            showCompletedModal,
+                        });
+                        transitionTo('finished');
+                        phaseTimer.pause();
+                        console.log('🏁 [COMPLETE] Transitioned to finished, timer paused');
+                    }}
                 />
             );
         }
 
         if (isFinished) {
+            console.log('🏆 [FINISHED_PHASE] Workout finished, showing last cooldown state');
+            // Show the last cooldown exercise frozen while modal is displayed
+            const currentCooldownExercise = cooldown[cooldownIndex];
+            const nextCooldownExercise = cooldownIndex < cooldown.length - 1 ? cooldown[cooldownIndex + 1].name : '';
+
             return (
-                <FinishedPhase
-                    showCompletedModal={showCompletedModal}
-                    showSuccessAlert={showSuccessAlert}
-                    totalElapsedTime={totalElapsedTime}
-                    onSaveWorkout={handleSaveWorkout}
-                    onSkipSave={() => {
-                        setShowCompletedModal(false);
-                        setShowSuccessAlert(true);
-                    }}
-                    onCloseSuccess={() => setShowSuccessAlert(false)}
-                    onContinue={() => {
-                        setShowSuccessAlert(false);
-                        router.back();
-                    }}
+                <CooldownPhase
+                    currentExercise={currentCooldownExercise}
+                    nextExercise={nextCooldownExercise}
+                    currentIndex={cooldownIndex}
+                    totalExercises={cooldown.length}
+                    timeLeft={phaseTimer.timeLeft}
+                    totalTimeRemaining={0}
+                    isPlaying={false}
+                    isMuted={isSoundMuted}
+                    onBack={handleBack}
+                    onMuteToggle={handleMuteToggle}
+                    onPlayPause={() => { }}
+                    onSkip={() => { }}
+                    showSkipButton={false}
                     onReset={handleResetRoutine}
+                    onComplete={() => { }}
                 />
             );
         }
@@ -484,23 +585,14 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
 
     return (
         <View style={styles.container}>
-            <Animated.View
-                style={[
-                    styles.phaseContainer,
-                    {
-                        opacity: phaseTransitionAnim,
-                        transform: [{
-                            scale: phaseTransitionAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [0.95, 1]
-                            })
-                        }]
-                    }
-                ]}
+            <PhaseTransition
+                phaseKey={phase}
+                type="zoom"
+                duration={500}
             >
                 {renderContent()}
-            </Animated.View>
-            {!isFinished && <SpotifyButton position="top-right" />}
+            </PhaseTransition>
+            {!isFinished && !isPreview && <SpotifyButton position="top-right" />}
 
             {/* Skip Confirmation Dialog */}
             <SkipConfirmationDialog
@@ -510,15 +602,30 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                 onConfirm={executeSkip}
                 onCancel={cancelSkip}
             />
+
+            {/* Workout Completed Modal - Outside phase rendering to persist */}
+            <WorkoutCompletedModal
+                visible={showCompletedModal}
+                duration={totalElapsedTime}
+                calories={Math.round((totalElapsedTime / 60) * 12)}
+                onSave={async (notes) => {
+                    await handleSaveWorkout(notes);
+                    setShowCompletedModal(false);
+                    console.log('💾 [MODAL] Workout saved, navigating to dashboard');
+                    router.replace('/(tabs)');
+                }}
+                onSkip={() => {
+                    console.log('⏭️ [MODAL] Skip save pressed, navigating to dashboard');
+                    setShowCompletedModal(false);
+                    router.replace('/(tabs)');
+                }}
+            />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-    },
-    phaseContainer: {
         flex: 1,
     },
 });

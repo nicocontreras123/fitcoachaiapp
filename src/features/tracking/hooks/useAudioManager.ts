@@ -1,6 +1,6 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import * as Speech from 'expo-speech';
-import { useAudioPlayer, AudioSource } from 'expo-audio';
+import { useAudioPlayer, AudioSource, AudioPlayer } from 'expo-audio';
 import { TimerPhase } from '../types/timer.types';
 import { useSpotifyAudioControl } from './useSpotifyAudioControl';
 
@@ -9,6 +9,8 @@ import { useSpotifyAudioControl } from './useSpotifyAudioControl';
  * Centralizes all audio and voice functionality
  * Prevents duplicate audio logic across components
  * Integrates with Spotify audio ducking
+ * 
+ * SINGLETON PATTERN: Only one instance of audio players and refs exist
  */
 
 interface AudioManagerConfig {
@@ -18,6 +20,13 @@ interface AudioManagerConfig {
     tickSoundSource?: AudioSource;
     bellSoundSource?: AudioSource;
 }
+
+// Singleton state - shared across all hook instances
+let singletonTickPlayer: AudioPlayer | null = null;
+let singletonBellPlayer: AudioPlayer | null = null;
+let isTickPlaying = false;
+let isSpeaking = false;
+let isInitialized = false;
 
 export const useAudioManager = (config: AudioManagerConfig = {}) => {
     const {
@@ -31,7 +40,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
     // Spotify audio control
     const { enableDucking, disableDucking } = useSpotifyAudioControl();
 
-    // Audio players
+    // Audio players (these are still created per component, but their instances are stored in the singleton)
     const tickPlayer = useAudioPlayer(
         tickSoundSource || (require('../../../../assets/tictac.mp3') as AudioSource)
     );
@@ -39,44 +48,57 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
         bellSoundSource || (require('../../../../assets/campana.mp3') as AudioSource)
     );
 
-    const isTickPlayingRef = useRef(false);
-    const isSpeakingRef = useRef(false);
-
-    // Set volumes
+    // Store players in singleton on first initialization
     useEffect(() => {
-        if (tickPlayer) {
-            tickPlayer.volume = 0.8;
-        }
-        if (bellPlayer) {
-            bellPlayer.volume = 1.0;
+        if (!isInitialized && tickPlayer && bellPlayer) {
+            console.log('🎵 [AUDIO_MANAGER] Initializing singleton audio players');
+            singletonTickPlayer = tickPlayer;
+            singletonBellPlayer = bellPlayer;
+            isInitialized = true;
+
+            // Set volumes
+            if (singletonTickPlayer) {
+                singletonTickPlayer.volume = 0.8;
+            }
+            if (singletonBellPlayer) {
+                singletonBellPlayer.volume = 1.0;
+            }
         }
     }, [tickPlayer, bellPlayer]);
 
     // Cleanup on unmount
     useEffect(() => {
+        console.log('🎵 [AUDIO_MANAGER] Hook mounted/updated');
+
         return () => {
+            console.log('🎵 [AUDIO_MANAGER] Cleanup - stopping audio');
             try {
                 // Wrap in try-catch to avoid "released object" errors during unmount cleanup
                 try {
-                    if (tickPlayer?.playing) {
-                        tickPlayer.pause();
+                    if (singletonTickPlayer?.playing) {
+                        singletonTickPlayer.pause();
                     }
                 } catch (e) {
                     // Ignore release errors
                 }
 
                 try {
-                    if (bellPlayer?.playing) {
-                        bellPlayer.pause();
+                    if (singletonBellPlayer?.playing) {
+                        singletonBellPlayer.pause();
                     }
                 } catch (e) {
                     // Ignore release errors
                 }
+
+                // Reset singleton state on unmount
+                isTickPlaying = false;
+                isSpeaking = false;
+                console.log('🎵 [AUDIO_MANAGER] Singleton state reset');
             } catch (error) {
                 // Ignore cleanup errors
             }
         };
-    }, [tickPlayer, bellPlayer]);
+    }, []);
 
     /**
      * Speak text if voice is enabled
@@ -100,7 +122,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
             try {
                 // Activar ducking cuando empieza a hablar
                 enableDucking();
-                isSpeakingRef.current = true;
+                isSpeaking = true;
 
 
                 Speech.speak(text, {
@@ -110,20 +132,20 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
                     volume: 1.0,       // Volumen máximo para que se escuche sobre Spotify
                     ...options,
                     onDone: () => {
-                        isSpeakingRef.current = false;
+                        isSpeaking = false;
                         // OPTIMIZACIÓN: No desactivar ducking para evitar pausas en Spotify
                         // El ducking se mantiene activo durante todo el entrenamiento
                         options?.onDone?.();
                     },
                     onError: (error: any) => {
                         console.error('❌ [AUDIO] Speech error:', error);
-                        isSpeakingRef.current = false;
+                        isSpeaking = false;
                         options?.onError?.(error);
                     },
                 });
             } catch (error) {
                 console.error('❌ [AUDIO] Error speaking:', error);
-                isSpeakingRef.current = false;
+                isSpeaking = false;
             }
         },
         [voiceEnabled, language, enableDucking, disableDucking]
@@ -145,34 +167,45 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
     /**
      * Start tick-tack sound
      * Activates ducking to lower Spotify volume
+     * SINGLETON: Uses shared state to prevent multiple play calls
      */
     const startTickSound = useCallback(() => {
-        if (!timerSoundEnabled || !tickPlayer) {
+        if (!timerSoundEnabled || !singletonTickPlayer) {
+            console.log('⏭️ [TICK_SOUND] Tick sound disabled or player not ready');
             return;
         }
 
         try {
-            if (!tickPlayer.playing && !isTickPlayingRef.current) {
-                // Activar ducking cuando empieza el tick-tock
-                enableDucking();
-
-                tickPlayer.loop = true;
-                tickPlayer.volume = 1.0; // Volumen máximo para que se escuche sobre Spotify
-                tickPlayer.play();
-                isTickPlayingRef.current = true;
-
+            // Check singleton state first - prevents multiple play calls
+            if (isTickPlaying) {
+                console.log('⏩ [TICK_SOUND] Tick sound already playing (singleton check)');
+                return;
             }
+
+            console.log('▶️ [TICK_SOUND] Starting tick sound', {
+                playerPlaying: singletonTickPlayer.playing,
+                singletonPlaying: isTickPlaying
+            });
+
+            // Activar ducking cuando empieza el tick-tock
+            enableDucking();
+
+            singletonTickPlayer.loop = true;
+            singletonTickPlayer.volume = 1.0; // Volumen máximo para que se escuche sobre Spotify
+            singletonTickPlayer.play();
+            isTickPlaying = true;
+            console.log('✅ [TICK_SOUND] Tick sound started successfully, singleton state:', isTickPlaying);
         } catch (error) {
-            console.error('❌ [AUDIO] Error starting tick sound:', error);
+            console.error('❌ [TICK_SOUND] Error starting tick sound:', error);
         }
-    }, [timerSoundEnabled, tickPlayer, enableDucking]);
+    }, [timerSoundEnabled, enableDucking]);
 
     /**
      * Stop tick-tack sound
      * NOTA: Mantiene el ducking activo para evitar pausas en Spotify
      */
     const stopTickSound = useCallback(() => {
-        if (!tickPlayer) {
+        if (!singletonTickPlayer) {
             return;
         }
 
@@ -181,9 +214,10 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
             // The error "Cannot use shared object that was already released" happens here
             // if we try to access properties of a released player
             try {
-                if (tickPlayer.playing || isTickPlayingRef.current) {
-                    tickPlayer.pause();
-                    isTickPlayingRef.current = false;
+                if (singletonTickPlayer.playing || isTickPlaying) {
+                    singletonTickPlayer.pause();
+                    isTickPlaying = false;
+                    console.log('⏸️ [TICK_SOUND] Tick sound stopped');
 
                     // OPTIMIZACIÓN: No desactivar ducking durante el entrenamiento
                     // Mantenerlo activo evita pausas constantes en Spotify
@@ -193,7 +227,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
                 // If the player is already released, we can assume it's stopped and ignore the error
                 if (innerError?.message?.includes('already released') ||
                     innerError?.message?.includes('received class java.lang.Integer')) {
-                    isTickPlayingRef.current = false;
+                    isTickPlaying = false;
                     return;
                 }
                 throw innerError;
@@ -201,21 +235,21 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
         } catch (error) {
             console.error('❌ [AUDIO] Error stopping tick sound:', error);
         }
-    }, [tickPlayer]);
+    }, []);
 
     /**
      * Play bell sound
      */
     const playBell = useCallback(() => {
-        if (!timerSoundEnabled || !bellPlayer) return;
+        if (!timerSoundEnabled || !singletonBellPlayer) return;
 
         try {
-            bellPlayer.seekTo(0);
-            bellPlayer.play();
+            singletonBellPlayer.seekTo(0);
+            singletonBellPlayer.play();
         } catch (error) {
             console.error('Error playing bell sound:', error);
         }
-    }, [timerSoundEnabled, bellPlayer]);
+    }, [timerSoundEnabled]);
 
     /**
      * Announce phase transition
@@ -336,7 +370,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
         announceRest,
 
         // Players (for advanced use)
-        tickPlayer,
-        bellPlayer,
+        tickPlayer: singletonTickPlayer,
+        bellPlayer: singletonBellPlayer,
     };
 };

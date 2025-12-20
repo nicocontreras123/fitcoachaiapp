@@ -79,34 +79,51 @@ export const TimerControls: React.FC<TimerControlsProps> = ({
                 </Pressable>
 
                 {onComplete ? (
-                    <Pressable
-                        style={[styles.skipButton, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}
-                        onPress={onComplete}
-                        disabled={disabled}
-                    >
-                        <MaterialCommunityIcons
-                            name="check"
-                            size={28}
-                            color="#10b981"
-                        />
-                    </Pressable>
+                    <>
+                        {console.log('✅ [CONTROLS] Rendering COMPLETE button')}
+                        <Pressable
+                            style={[styles.skipButton, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}
+                            onPress={() => {
+                                console.log('✅ [CONTROLS] Complete button pressed');
+                                onComplete();
+                            }}
+                            disabled={disabled}
+                        >
+                            <MaterialCommunityIcons
+                                name="check"
+                                size={28}
+                                color="#10b981"
+                            />
+                        </Pressable>
+                    </>
                 ) : (showSkipButton && onSkip) ? (
-                    <Pressable
-                        style={styles.skipButton}
-                        onPress={onSkip}
-                        disabled={disabled || disableSkip}
-                    >
-                        <MaterialCommunityIcons
-                            name="skip-next"
-                            size={28}
-                            color={
-                                disabled || disableSkip
-                                    ? 'rgba(255,255,255,0.2)'
-                                    : '#ffffff'
-                            }
-                        />
-                    </Pressable>
-                ) : null}
+                    <>
+                        {console.log('⏭️ [CONTROLS] Rendering SKIP button')}
+                        <Pressable
+                            style={styles.skipButton}
+                            onPress={() => {
+                                console.log('⏭️ [CONTROLS] Skip button pressed');
+                                onSkip();
+                            }}
+                            disabled={disabled || disableSkip}
+                        >
+                            <MaterialCommunityIcons
+                                name="skip-next"
+                                size={28}
+                                color={
+                                    disabled || disableSkip
+                                        ? 'rgba(255,255,255,0.2)'
+                                        : '#ffffff'
+                                }
+                            />
+                        </Pressable>
+                    </>
+                ) : (
+                    <>
+                        {console.log('❌ [CONTROLS] No skip/complete button')}
+                        {null}
+                    </>
+                )}
             </View>
         </View>
     );

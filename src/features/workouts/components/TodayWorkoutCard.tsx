@@ -9,9 +9,10 @@ import { translateLevel } from '@/utils/translations';
 interface TodayWorkoutCardProps {
     dayInfo: DailyRoutine;
     onPress: () => void;
+    isCompleted?: boolean;
 }
 
-export const TodayWorkoutCard: React.FC<TodayWorkoutCardProps> = ({ dayInfo, onPress }) => {
+export const TodayWorkoutCard: React.FC<TodayWorkoutCardProps> = ({ dayInfo, onPress, isCompleted = false }) => {
     const { day, workout, restDay } = dayInfo;
     const theme = useTheme();
 
@@ -63,9 +64,17 @@ export const TodayWorkoutCard: React.FC<TodayWorkoutCardProps> = ({ dayInfo, onP
                     >
                         <View style={styles.headerContent}>
                             <View>
-                                <Text variant="labelMedium" style={styles.todayLabel}>
-                                    HOY • {day.toUpperCase()}
-                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Text variant="labelMedium" style={styles.todayLabel}>
+                                        HOY • {day.toUpperCase()}
+                                    </Text>
+                                    {isCompleted && (
+                                        <View style={styles.completedBadge}>
+                                            <MaterialCommunityIcons name="check-circle" size={16} color="#10b981" />
+                                            <Text style={styles.completedText}>COMPLETADO</Text>
+                                        </View>
+                                    )}
+                                </View>
                                 <Text variant="headlineMedium" style={styles.headerTitle}>
                                     {workout?.title || 'Entrenamiento'}
                                 </Text>
@@ -183,9 +192,15 @@ export const TodayWorkoutCard: React.FC<TodayWorkoutCardProps> = ({ dayInfo, onP
                         </View>
 
                         {/* CTA Button */}
-                        <View style={[styles.ctaButton, { backgroundColor: gradientColors[0] }]}>
-                            <Text variant="titleMedium" style={styles.ctaText}>Comenzar Entrenamiento</Text>
-                            <MaterialCommunityIcons name="arrow-right" size={24} color="#ffffff" />
+                        <View style={[styles.ctaButton, { backgroundColor: isCompleted ? '#10b981' : gradientColors[0] }]}>
+                            <Text variant="titleMedium" style={styles.ctaText}>
+                                {isCompleted ? 'Empezar Nuevamente' : 'Comenzar Entrenamiento'}
+                            </Text>
+                            <MaterialCommunityIcons
+                                name={isCompleted ? 'refresh' : 'arrow-right'}
+                                size={24}
+                                color="#ffffff"
+                            />
                         </View>
                     </View>
                 </View>
@@ -329,5 +344,22 @@ const styles = StyleSheet.create({
     restTitle: {
         fontWeight: 'bold',
         marginTop: 8,
+    },
+    completedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#10b981',
+    },
+    completedText: {
+        color: '#10b981',
+        fontSize: 10,
+        fontWeight: '900',
+        letterSpacing: 0.5,
     },
 });

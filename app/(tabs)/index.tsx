@@ -318,12 +318,20 @@ export default function DashboardScreen() {
                     {(nextWorkout?.workout as any)?.type ? WORKOUT_LABELS[(nextWorkout?.workout as any).type] || 'FUERZA' : 'FUERZA'}
                   </Text>
                 </View>
-                <View style={styles.workoutLevelBadge}>
-                  <MaterialCommunityIcons name="dumbbell" size={14} color="#fff" />
-                  <Text style={styles.workoutLevelText}>
-                    {nextWorkout?.workout?.difficulty === 'advanced' ? 'Avanzado' :
-                      nextWorkout?.workout?.difficulty === 'beginner' ? 'Principiante' : 'Intermedio'}
-                  </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {todayWorkouts > 0 && (
+                    <View style={styles.completedBadge}>
+                      <MaterialCommunityIcons name="check-circle" size={14} color="#10b981" />
+                      <Text style={styles.completedText}>COMPLETADO</Text>
+                    </View>
+                  )}
+                  <View style={styles.workoutLevelBadge}>
+                    <MaterialCommunityIcons name="dumbbell" size={14} color="#fff" />
+                    <Text style={styles.workoutLevelText}>
+                      {nextWorkout?.workout?.difficulty === 'advanced' ? 'Avanzado' :
+                        nextWorkout?.workout?.difficulty === 'beginner' ? 'Principiante' : 'Intermedio'}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
@@ -345,6 +353,18 @@ export default function DashboardScreen() {
                   <MaterialCommunityIcons name="lightning-bolt" size={18} color={COLORS.primary.DEFAULT} />
                   <Text style={styles.workoutMetaText}>{Math.round((nextWorkout?.workout?.totalDuration || 45) * 8)} kcal</Text>
                 </View>
+              </View>
+
+              {/* CTA Button */}
+              <View style={[styles.workoutButton, { backgroundColor: todayWorkouts > 0 ? '#10b981' : COLORS.primary.DEFAULT }]}>
+                <Text style={styles.workoutButtonText}>
+                  {todayWorkouts > 0 ? 'Empezar Nuevamente' : 'Iniciar Ahora'}
+                </Text>
+                <MaterialCommunityIcons
+                  name={todayWorkouts > 0 ? 'refresh' : 'arrow-right'}
+                  size={20}
+                  color={COLORS.background.dark}
+                />
               </View>
             </View>
           </Pressable>
@@ -683,5 +703,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Lexend_700Bold',
     color: COLORS.background.dark,
+  },
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  completedText: {
+    fontSize: 10,
+    fontFamily: 'Lexend_700Bold',
+    color: '#10b981',
+    letterSpacing: 0.5,
+  },
+  workoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 8,
+  },
+  workoutButtonText: {
+    fontSize: 15,
+    fontFamily: 'Lexend_700Bold',
+    color: COLORS.background.dark,
+    letterSpacing: 0.5,
   },
 });

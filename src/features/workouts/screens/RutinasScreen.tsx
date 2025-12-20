@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore } from '../store/useWorkoutStore';
 import { useUserStore } from '@/features/profile/store/userStore';
 import { COLORS } from '@/constants/theme';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
 
 const DAY_NAMES: Record<string, string> = {
     'lunes': 'LUN',
@@ -29,6 +30,7 @@ export default function RutinasScreen() {
     const router = useRouter();
     const { currentWeeklyRoutine, generateWeeklyRoutine, isGenerating, setCurrentWorkout, loadWeeklyRoutine } = useWorkoutStore();
     const { userData } = useUserStore();
+    const { todayWorkouts } = useDashboardStats();
 
     // Cargar rutina al montar el componente
     React.useEffect(() => {
@@ -208,8 +210,16 @@ export default function RutinasScreen() {
 
                             <View style={styles.featuredContent}>
                                 <View style={styles.featuredHeader}>
-                                    <View style={styles.todayBadge}>
-                                        <Text style={styles.todayBadgeText}>HOY</Text>
+                                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                                        <View style={styles.todayBadge}>
+                                            <Text style={styles.todayBadgeText}>HOY</Text>
+                                        </View>
+                                        {todayWorkouts > 0 && (
+                                            <View style={styles.completedBadge}>
+                                                <MaterialCommunityIcons name="check-circle" size={14} color="#10b981" />
+                                                <Text style={styles.completedText}>COMPLETADO</Text>
+                                            </View>
+                                        )}
                                     </View>
                                     <MaterialCommunityIcons name="dots-vertical" size={24} color="rgba(255,255,255,0.7)" />
                                 </View>
@@ -240,11 +250,17 @@ export default function RutinasScreen() {
                                     </View>
 
                                     <Pressable
-                                        style={styles.startButton}
+                                        style={[styles.startButton, { backgroundColor: todayWorkouts > 0 ? '#10b981' : COLORS.primary.DEFAULT }]}
                                         onPress={() => handleStartWorkout(todayWorkout.workout)}
                                     >
-                                        <MaterialCommunityIcons name="play" size={24} color={COLORS.background.dark} />
-                                        <Text style={styles.startButtonText}>Iniciar ahora</Text>
+                                        <MaterialCommunityIcons
+                                            name={todayWorkouts > 0 ? 'refresh' : 'play'}
+                                            size={24}
+                                            color={COLORS.background.dark}
+                                        />
+                                        <Text style={styles.startButtonText}>
+                                            {todayWorkouts > 0 ? 'Empezar Nuevamente' : 'Iniciar ahora'}
+                                        </Text>
                                     </Pressable>
                                 </View>
                             </View>
@@ -700,5 +716,22 @@ const styles = StyleSheet.create({
         fontFamily: 'Lexend_400Regular',
         color: '#9ca3af',
         textAlign: 'center',
+    },
+    completedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(16, 185, 129, 0.2)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#10b981',
+    },
+    completedText: {
+        fontSize: 10,
+        fontFamily: 'Lexend_700Bold',
+        color: '#10b981',
+        letterSpacing: 0.5,
     },
 });

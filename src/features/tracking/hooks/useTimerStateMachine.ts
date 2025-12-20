@@ -19,12 +19,13 @@ type StateMachineAction =
 
 // Valid phase transitions
 const VALID_TRANSITIONS: Record<TimerPhase, TimerPhase[]> = {
-    idle: ['preparing', 'warmup', 'workout'],
+    preview: ['preparing', 'warmup', 'workout', 'idle'],
+    idle: ['preview', 'preparing', 'warmup', 'workout'],
     preparing: ['warmup', 'workout'],
-    warmup: ['workout', 'idle'],
-    workout: ['cooldown', 'finished', 'warmup'],
-    cooldown: ['finished', 'workout'],
-    finished: ['idle'],
+    warmup: ['workout', 'idle', 'preview'],
+    workout: ['cooldown', 'finished', 'warmup', 'preview'],
+    cooldown: ['finished', 'workout', 'preview'],
+    finished: ['idle', 'preview'],
 };
 
 const stateMachineReducer = (
@@ -102,6 +103,7 @@ export const useTimerStateMachine = (initialPhase: TimerPhase = 'idle') => {
     );
 
     // Phase checks
+    const isPreview = useMemo(() => state.phase === 'preview', [state.phase]);
     const isIdle = useMemo(() => state.phase === 'idle', [state.phase]);
     const isPreparing = useMemo(() => state.phase === 'preparing', [state.phase]);
     const isWarmup = useMemo(() => state.phase === 'warmup', [state.phase]);
@@ -122,6 +124,7 @@ export const useTimerStateMachine = (initialPhase: TimerPhase = 'idle') => {
         canTransitionTo,
 
         // Helpers
+        isPreview,
         isIdle,
         isPreparing,
         isWarmup,

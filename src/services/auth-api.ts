@@ -9,18 +9,50 @@ console.log('🔐 Auth API Configuration:', {
 });
 
 const TOKEN_KEY = 'fitcoach_access_token';
+const TOKEN_TIMESTAMP_KEY = 'fitcoach_token_timestamp';
 
 export const authApi = {
   async saveToken(token: string) {
-    await AsyncStorage.setItem(TOKEN_KEY, token);
+    const timestamp = Date.now().toString();
+    await AsyncStorage.multiSet([
+      [TOKEN_KEY, token],
+      [TOKEN_TIMESTAMP_KEY, timestamp]
+    ]);
+    console.log('💾 [AUTH_API] Token saved with timestamp:', new Date(parseInt(timestamp)).toISOString());
   },
 
   async getToken(): Promise<string | null> {
-    return await AsyncStorage.getItem(TOKEN_KEY);
+    try {
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        console.log('ℹ️ [AUTH_API] No token found in storage');
+        return null;
+      }
+
+      // Verificar timestamp del token
+      const timestamp = await AsyncStorage.getItem(TOKEN_TIMESTAMP_KEY);
+      if (timestamp) {
+        const tokenAge = Date.now() - parseInt(timestamp);
+        const tokenAgeDays = tokenAge / (1000 * 60 * 60 * 24);
+        console.log('🕐 [AUTH_API] Token age:', tokenAgeDays.toFixed(2), 'days');
+
+        // Si el token tiene más de 30 días, es probable que haya expirado
+        if (tokenAgeDays > 30) {
+          console.warn('⚠️ [AUTH_API] Token is older than 30 days, may be expired');
+          // No lo borramos automáticamente, dejamos que el servidor lo valide
+        }
+      }
+
+      return token;
+    } catch (error) {
+      console.error('❌ [AUTH_API] Error getting token:', error);
+      return null;
+    }
   },
 
   async removeToken() {
-    await AsyncStorage.removeItem(TOKEN_KEY);
+    await AsyncStorage.multiRemove([TOKEN_KEY, TOKEN_TIMESTAMP_KEY]);
+    console.log('🗑️ [AUTH_API] Token and timestamp removed');
   },
 
   async signup(email: string, password: string): Promise<{ access_token: string; user: any }> {

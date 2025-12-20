@@ -3,7 +3,7 @@
  */
 
 // Timer phases
-export type TimerPhase = 'idle' | 'preparing' | 'warmup' | 'workout' | 'cooldown' | 'finished';
+export type TimerPhase = 'preview' | 'idle' | 'preparing' | 'warmup' | 'workout' | 'cooldown' | 'finished';
 
 // Workout types
 export type WorkoutType = 'gym' | 'boxing' | 'running';

@@ -24,25 +24,24 @@ export const useBoxingPhaseHandlers = ({
 }) => {
     const [warmupIndex, setWarmupIndex] = useState(0);
     const [cooldownIndex, setCooldownIndex] = useState(0);
+    const [isPostWarmupRest, setIsPostWarmupRest] = useState(false);
 
     const handlePhaseComplete = useCallback(() => {
-        console.log('✅ [PHASE_COMPLETE] Phase completed', {
-            warmupIndex,
-            cooldownIndex,
-        });
+        // Post-warmup rest complete
+        if (isPostWarmupRest) {
+            setIsPostWarmupRest(false);
+            transitionTo('workout');
+            phaseTimer.pause();
+            if (!isActive) toggleTimer();
+            return;
+        }
 
         // Warmup phase completion
         if (warmupIndex < warmup.length - 1) {
             const nextIndex = warmupIndex + 1;
             const nextExercise = warmup[nextIndex];
-            console.log('➡️ [WARMUP] Moving to next warmup exercise', {
-                currentIndex: warmupIndex,
-                nextIndex,
-                nextExercise,
-            });
 
             if (!nextExercise.duration || nextExercise.duration <= 0) {
-                console.error('❌ [WARMUP] Invalid next exercise duration:', nextExercise.duration);
                 setWarmupIndex(nextIndex);
                 handlePhaseComplete();
                 return;
@@ -50,17 +49,12 @@ export const useBoxingPhaseHandlers = ({
 
             setWarmupIndex(nextIndex);
             phaseTimer.setTimeAndStart(nextExercise.duration);
-
             audio.announceExercise(nextExercise.name);
         } else if (warmupIndex === warmup.length - 1 && warmup.length > 0) {
-            // Warmup complete, start workout
-
-            transitionTo('workout');
-            phaseTimer.pause();
-            if (!isActive) {
-
-                toggleTimer();
-            }
+            // Warmup complete, start post-warmup rest
+            setIsPostWarmupRest(true);
+            phaseTimer.setTimeAndStart(60);
+            audio.speak('Calentamiento completo. Prepárate para el entrenamiento');
         }
         // Cooldown phase completion
         else if (cooldownIndex < cooldown.length - 1) {
@@ -77,16 +71,18 @@ export const useBoxingPhaseHandlers = ({
             transitionTo('finished');
             phaseTimer.pause();
         }
-    }, [warmupIndex, cooldownIndex, warmup, cooldown, phaseTimer, audio, transitionTo, isActive, toggleTimer]);
+    }, [warmupIndex, cooldownIndex, isPostWarmupRest, warmup, cooldown, phaseTimer, audio, transitionTo, isActive, toggleTimer]);
 
     const resetIndices = useCallback(() => {
         setWarmupIndex(0);
         setCooldownIndex(0);
+        setIsPostWarmupRest(false);
     }, []);
 
     return {
         warmupIndex,
         cooldownIndex,
+        isPostWarmupRest,
         setWarmupIndex,
         setCooldownIndex,
         handlePhaseComplete,

@@ -7,6 +7,7 @@ import { TimerControls } from '../../shared';
 
 interface WarmupPhaseProps {
     isPreparing: boolean;
+    isPostWarmupRest?: boolean;
     displayTime: number;
     currentExercise: any;
     nextExercise: string;
@@ -28,6 +29,7 @@ interface WarmupPhaseProps {
 
 export const WarmupPhase: React.FC<WarmupPhaseProps> = ({
     isPreparing,
+    isPostWarmupRest,
     displayTime,
     currentExercise,
     nextExercise,
@@ -42,10 +44,22 @@ export const WarmupPhase: React.FC<WarmupPhaseProps> = ({
     onReset,
     showSkipButton = true,
 }) => {
+    const getTitle = () => {
+        if (isPreparing) return 'Preparación';
+        if (isPostWarmupRest) return 'Descanso';
+        return 'Calentamiento';
+    };
+
+    const getPhaseTitle = () => {
+        if (isPreparing) return 'PREPÁRATE';
+        if (isPostWarmupRest) return 'DESCANSO';
+        return currentExercise?.name?.toUpperCase() || 'CALENTAMIENTO';
+    };
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: phaseColors.bg }]} edges={['top', 'left', 'right']}>
             <BlurHeader
-                title={isPreparing ? 'Preparación' : 'Calentamiento'}
+                title={getTitle()}
                 onBack={onBack}
                 onMuteToggle={onMuteToggle}
                 isMuted={isMuted}
@@ -57,12 +71,10 @@ export const WarmupPhase: React.FC<WarmupPhaseProps> = ({
             />
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Phase Title - New Design */}
+                {/* Phase Title */}
                 <View style={styles.phaseIndicator}>
-                    <Text style={styles.phaseTitle}>
-                        {isPreparing ? 'PREPÁRATE' : currentExercise?.name?.toUpperCase() || 'CALENTAMIENTO'}
-                    </Text>
-                    {!isPreparing && (
+                    <Text style={styles.phaseTitle}>{getPhaseTitle()}</Text>
+                    {!isPreparing && !isPostWarmupRest && (
                         <View style={styles.phaseBadge}>
                             <View style={[styles.pulseDot, { backgroundColor: '#ff8c00' }]} />
                             <Text style={[styles.phaseLabel, { color: '#ff8c00' }]}>Preparación Física</Text>
@@ -90,7 +102,11 @@ export const WarmupPhase: React.FC<WarmupPhaseProps> = ({
 
                 {isPreparing ? (
                     <View style={styles.messageContainer}>
-                        <Text style={styles.messageText}>El calentamiento comenzará pronto</Text>
+                        <Text style={styles.messageLabel}>Primer Ejercicio</Text>
+                        <Text style={styles.messageText}>{currentExercise?.name || 'Calentamiento'}</Text>
+                        <Text style={styles.messageSubtext}>
+                            {currentExercise?.description || 'Prepara tu cuerpo para el entrenamiento'}
+                        </Text>
                     </View>
                 ) : (
                     <>
@@ -230,12 +246,29 @@ const styles = StyleSheet.create({
     messageContainer: {
         padding: 24,
         alignItems: 'center',
+        gap: 8,
+    },
+    messageLabel: {
+        fontSize: 12,
+        fontFamily: 'Lexend_700Bold',
+        color: '#ff8c00',
+        textTransform: 'uppercase',
+        letterSpacing: 1.5,
     },
     messageText: {
-        fontSize: 16,
-        color: 'rgba(255, 255, 255, 0.7)',
+        fontSize: 24,
+        fontFamily: 'Lexend_700Bold',
+        color: '#ffffff',
         textAlign: 'center',
-        lineHeight: 24,
+        lineHeight: 32,
+    },
+    messageSubtext: {
+        fontSize: 14,
+        fontFamily: 'Lexend_400Regular',
+        color: 'rgba(255, 255, 255, 0.6)',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginTop: 4,
     },
     nextExercise: {
         flexDirection: 'row',

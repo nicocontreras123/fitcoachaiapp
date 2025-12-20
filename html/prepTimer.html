@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Preparación: Rutina de Boxeo (Revisada)</title>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#ec1313",
+              "background-light": "#f8f6f6",
+              "background-dark": "#221010", 
+              "card-dark": "#2d1616",
+              "text-secondary": "#c99292",
+            },
+            fontFamily: {
+              "display": ["Lexend", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #221010; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #482323; 
+            border-radius: 3px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-white pb-24">
+<header class="sticky top-0 z-50 bg-background-light dark:bg-background-dark/95 backdrop-blur-sm border-b border-gray-200 dark:border-primary/10 transition-colors duration-300">
+<div class="flex items-center p-4 justify-between h-16">
+<button class="text-slate-900 dark:text-white flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
+                Rutina de Hoy
+            </h1>
+<button class="flex w-12 items-center justify-end group">
+<p class="text-primary dark:text-text-secondary text-base font-bold leading-normal group-hover:underline">Editar</p>
+</button>
+</div>
+</header>
+<main class="flex flex-col w-full max-w-md mx-auto">
+<section class="px-4 py-6">
+<h2 class="sr-only">Estadísticas de la sesión</h2>
+<div class="flex flex-wrap gap-3">
+<div class="flex min-w-[100px] flex-1 basis-[fit-content] flex-col gap-1 rounded-xl bg-white dark:bg-card-dark border border-gray-200 dark:border-primary/20 p-4 items-center text-center shadow-sm">
+<span class="material-symbols-outlined text-primary mb-1">timer</span>
+<p class="text-slate-900 dark:text-white text-xl font-bold leading-tight">55 m</p>
+<p class="text-gray-500 dark:text-text-secondary text-xs font-medium uppercase tracking-wider">Duración</p>
+</div>
+<div class="flex min-w-[100px] flex-1 basis-[fit-content] flex-col gap-1 rounded-xl bg-white dark:bg-card-dark border border-gray-200 dark:border-primary/20 p-4 items-center text-center shadow-sm">
+<span class="material-symbols-outlined text-primary mb-1">local_fire_department</span>
+<p class="text-slate-900 dark:text-white text-xl font-bold leading-tight">Extrema</p>
+<p class="text-gray-500 dark:text-text-secondary text-xs font-medium uppercase tracking-wider">Intensidad</p>
+</div>
+<div class="flex min-w-[100px] flex-1 basis-[fit-content] flex-col gap-1 rounded-xl bg-white dark:bg-card-dark border border-gray-200 dark:border-primary/20 p-4 items-center text-center shadow-sm">
+<span class="material-symbols-outlined text-primary mb-1">sports_mma</span>
+<p class="text-slate-900 dark:text-white text-xl font-bold leading-tight">12+</p>
+<p class="text-gray-500 dark:text-text-secondary text-xs font-medium uppercase tracking-wider">Circuitos</p>
+</div>
+</div>
+</section>
+<section class="mb-2">
+<div class="px-4 py-3 flex items-baseline justify-between sticky top-16 z-40 bg-background-light dark:bg-background-dark/95 backdrop-blur">
+<h3 class="text-slate-900 dark:text-white text-[20px] font-bold leading-tight">Calentamiento</h3>
+<span class="text-sm font-medium text-gray-500 dark:text-gray-400">5 min</span>
+</div>
+<div class="flex flex-col divide-y divide-gray-100 dark:divide-primary/10">
+<div class="flex items-center gap-4 px-4 py-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+<div class="flex items-center justify-center rounded-xl bg-primary/10 dark:bg-[#482323] text-primary dark:text-white shrink-0 size-12">
+<span class="material-symbols-outlined">fitness_center</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-medium truncate">Salto de cuerda</p>
+<p class="text-gray-500 dark:text-gray-400 text-sm">3 minutos • Ritmo medio</p>
+</div>
+<a class="shrink-0 size-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-primary/10 hover:text-primary transition-colors" href="https://www.google.com/search?q=como+saltar+cuerda+boxeo" target="_blank">
+<span class="material-symbols-outlined">search</span>
+</a>
+</div>
+<div class="flex items-center gap-4 px-4 py-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+<div class="flex items-center justify-center rounded-xl bg-primary/10 dark:bg-[#482323] text-primary dark:text-white shrink-0 size-12">
+<span class="material-symbols-outlined">accessibility_new</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-medium truncate">Sombra libre</p>
+<p class="text-gray-500 dark:text-gray-400 text-sm">2 minutos • Técnica pura</p>
+</div>
+<a class="shrink-0 size-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-primary/10 hover:text-primary transition-colors" href="https://www.google.com/search?q=boxeo+sombra+tecnica" target="_blank">
+<span class="material-symbols-outlined">search</span>
+</a>
+</div>
+</div>
+</section>
+<section class="mb-2">
+<div class="px-4 py-3 flex items-baseline justify-between sticky top-16 z-40 bg-background-light dark:bg-background-dark/95 backdrop-blur">
+<h3 class="text-primary text-[20px] font-bold leading-tight">Circuito de Pelea</h3>
+<span class="text-sm font-medium text-primary">40 min</span>
+</div>
+<div class="px-4 pb-4">
+<div class="rounded-2xl border border-primary/20 bg-white dark:bg-card-dark overflow-hidden shadow-md">
+<div class="flex items-center gap-4 px-4 py-4 border-b border-primary/10">
+<div class="flex flex-col items-center justify-center rounded-lg bg-primary/20 dark:bg-primary text-primary dark:text-white shrink-0 size-12">
+<span class="text-xs font-bold uppercase">Rnds</span>
+<span class="text-lg font-black leading-none">1-3</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-bold truncate">Básicos &amp; Jabs</p>
+<p class="text-gray-500 dark:text-text-secondary text-sm">Jab, Cross, Desplazamientos</p>
+</div>
+<a class="shrink-0 size-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-primary/10 hover:text-primary transition-colors" href="https://www.google.com/search?q=boxing+jab+footwork+drills" target="_blank">
+<span class="material-symbols-outlined">search</span>
+</a>
+</div>
+<div class="flex items-center gap-4 px-4 py-3 bg-red-50/50 dark:bg-primary/5 border-b border-primary/10">
+<div class="flex items-center justify-center rounded-lg text-primary shrink-0 size-12">
+<span class="material-symbols-outlined text-2xl">fitness_center</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-sm font-bold truncate">Burpees Explosivos</p>
+<p class="text-primary dark:text-primary/80 text-xs font-semibold uppercase tracking-wide">Descanso Activo • 1 min</p>
+</div>
+<a class="shrink-0 size-8 flex items-center justify-center rounded-full text-gray-400 hover:text-primary transition-colors" href="https://www.google.com/search?q=how+to+do+burpees" target="_blank">
+<span class="material-symbols-outlined text-lg">search</span>
+</a>
+</div>
+<div class="flex items-center gap-4 px-4 py-4 border-b border-primary/10">
+<div class="flex flex-col items-center justify-center rounded-lg bg-primary/20 dark:bg-primary text-primary dark:text-white shrink-0 size-12">
+<span class="text-xs font-bold uppercase">Rnds</span>
+<span class="text-lg font-black leading-none">4-6</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-bold truncate">Combos de Potencia</p>
+<p class="text-gray-500 dark:text-text-secondary text-sm">Jab-Cross-Hook-Uppercut</p>
+</div>
+<a class="shrink-0 size-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-primary/10 hover:text-primary transition-colors" href="https://www.google.com/search?q=boxing+power+combinations" target="_blank">
+<span class="material-symbols-outlined">search</span>
+</a>
+</div>
+<div class="flex items-center gap-4 px-4 py-3 bg-red-50/50 dark:bg-primary/5 border-b border-primary/10">
+<div class="flex items-center justify-center rounded-lg text-primary shrink-0 size-12">
+<span class="material-symbols-outlined text-2xl">directions_run</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-sm font-bold truncate">Mountain Climbers</p>
+<p class="text-primary dark:text-primary/80 text-xs font-semibold uppercase tracking-wide">Cardio • 1 min</p>
+</div>
+<a class="shrink-0 size-8 flex items-center justify-center rounded-full text-gray-400 hover:text-primary transition-colors" href="https://www.google.com/search?q=mountain+climbers+exercise" target="_blank">
+<span class="material-symbols-outlined text-lg">search</span>
+</a>
+</div>
+<div class="flex items-center gap-4 px-4 py-4 border-b border-primary/10">
+<div class="flex flex-col items-center justify-center rounded-lg bg-primary/20 dark:bg-primary text-primary dark:text-white shrink-0 size-12">
+<span class="text-xs font-bold uppercase">Rnds</span>
+<span class="text-lg font-black leading-none">7-9</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-bold truncate">Defensa y Contra</p>
+<p class="text-gray-500 dark:text-text-secondary text-sm">Esquivas, Rolls y Bloqueos</p>
+</div>
+<a class="shrink-0 size-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-primary/10 hover:text-primary transition-colors" href="https://www.google.com/search?q=boxing+defense+drills" target="_blank">
+<span class="material-symbols-outlined">search</span>
+</a>
+</div>
+<div class="flex items-center gap-4 px-4 py-3 bg-red-50/50 dark:bg-primary/5 border-b border-primary/10">
+<div class="flex items-center justify-center rounded-lg text-primary shrink-0 size-12">
+<span class="material-symbols-outlined text-2xl">vertical_align_bottom</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-sm font-bold truncate">Sentadillas con Salto</p>
+<p class="text-primary dark:text-primary/80 text-xs font-semibold uppercase tracking-wide">Piernas • 1 min</p>
+</div>
+<a class="shrink-0 size-8 flex items-center justify-center rounded-full text-gray-400 hover:text-primary transition-colors" href="https://www.google.com/search?q=jump+squats+exercise" target="_blank">
+<span class="material-symbols-outlined text-lg">search</span>
+</a>
+</div>
+<div class="flex items-center gap-4 px-4 py-4">
+<div class="flex flex-col items-center justify-center rounded-lg bg-primary/20 dark:bg-primary text-primary dark:text-white shrink-0 size-12">
+<span class="text-xs font-bold uppercase">Rnds</span>
+<span class="text-lg font-black leading-none">10+</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-bold truncate">Potencia Libre</p>
+<p class="text-gray-500 dark:text-text-secondary text-sm">Saco pesado / Heavy Bag</p>
+</div>
+<a class="shrink-0 size-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-primary/10 hover:text-primary transition-colors" href="https://www.google.com/search?q=heavy+bag+drills" target="_blank">
+<span class="material-symbols-outlined">search</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<section class="mb-4">
+<div class="px-4 py-3 flex items-baseline justify-between sticky top-16 z-40 bg-background-light dark:bg-background-dark/95 backdrop-blur">
+<h3 class="text-slate-900 dark:text-white text-[20px] font-bold leading-tight">Enfriamiento</h3>
+<span class="text-sm font-medium text-gray-500 dark:text-gray-400">10 min</span>
+</div>
+<div class="flex flex-col divide-y divide-gray-100 dark:divide-primary/10">
+<div class="flex items-center gap-4 px-4 py-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+<div class="flex items-center justify-center rounded-xl bg-primary/10 dark:bg-[#482323] text-primary dark:text-white shrink-0 size-12">
+<span class="material-symbols-outlined">self_improvement</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-medium truncate">Estiramiento de hombros</p>
+<p class="text-gray-500 dark:text-gray-400 text-sm">Estático • 2 min</p>
+</div>
+<a class="shrink-0 size-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-primary/10 hover:text-primary transition-colors" href="https://www.google.com/search?q=estiramiento+hombros+boxeo" target="_blank">
+<span class="material-symbols-outlined">search</span>
+</a>
+</div>
+<div class="flex items-center gap-4 px-4 py-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+<div class="flex items-center justify-center rounded-xl bg-primary/10 dark:bg-[#482323] text-primary dark:text-white shrink-0 size-12">
+<span class="material-symbols-outlined">waves</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-slate-900 dark:text-white text-base font-medium truncate">Cobra stretch</p>
+<p class="text-gray-500 dark:text-gray-400 text-sm">Estático • 2 min</p>
+</div>
+<a class="shrink-0 size-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-primary/10 hover:text-primary transition-colors" href="https://www.google.com/search?q=cobra+stretch+yoga" target="_blank">
+<span class="material-symbols-outlined">search</span>
+</a>
+</div>
+</div>
+</section>
+</main>
+<div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background-light via-background-light to-transparent dark:from-background-dark dark:via-background-dark dark:to-transparent z-50">
+<div class="max-w-md mx-auto">
+<button class="w-full bg-primary hover:bg-red-700 text-white font-bold text-lg h-14 rounded-xl shadow-lg shadow-red-900/40 flex items-center justify-center gap-3 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined">play_arrow</span>
+                INICIAR TIMER
+            </button>
+</div>
+</div>
+
+</body></html>

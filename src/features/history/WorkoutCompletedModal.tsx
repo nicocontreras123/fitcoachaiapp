@@ -36,10 +36,23 @@ export const WorkoutCompletedModal: React.FC<WorkoutCompletedModalProps> = ({
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    console.log('💾 [WORKOUT_MODAL] Rendering', { visible, duration, calories, notes });
+
     return (
-        <Modal transparent visible={visible} animationType="fade">
-            <BlurView intensity={20} style={styles.container}>
-                <Pressable style={styles.backdrop} onPress={onSkip} />
+        <Modal
+            transparent
+            visible={visible}
+            animationType="fade"
+            statusBarTranslucent
+        >
+            <View style={styles.container}>
+                <Pressable
+                    style={styles.backdrop}
+                    onPress={() => {
+                        console.log('💾 [WORKOUT_MODAL] Backdrop pressed - calling onSkip');
+                        onSkip();
+                    }}
+                />
 
                 <Animated.View style={styles.modal}>
                     <Surface style={styles.surface} elevation={5}>
@@ -109,7 +122,7 @@ export const WorkoutCompletedModal: React.FC<WorkoutCompletedModalProps> = ({
                         </View>
                     </Surface>
                 </Animated.View>
-            </BlurView>
+            </View>
         </Modal>
     );
 };
@@ -120,6 +133,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 16,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
     },
     backdrop: {
         ...StyleSheet.absoluteFillObject,

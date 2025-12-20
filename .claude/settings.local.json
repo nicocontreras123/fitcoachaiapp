@@ -18,7 +18,8 @@
       "Bash(npx expo-doctor)",
       "Bash(git rm:*)",
       "Bash(npx tsc:*)",
-      "Bash(file:*)"
+      "Bash(file:*)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

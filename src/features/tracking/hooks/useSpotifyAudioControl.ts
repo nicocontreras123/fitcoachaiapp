@@ -16,23 +16,25 @@ export const useSpotifyAudioControl = () => {
 
     const configureAudioSession = async () => {
         try {
+            console.log('🎵 [SPOTIFY_AUDIO] Configuring audio session for mixing');
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: false,
                 staysActiveInBackground: true,
                 playsInSilentModeIOS: true,
-                shouldDuckAndroid: true, // Baja el volumen de otras apps en Android
+                shouldDuckAndroid: false, // Changed: Don't duck, mix instead
                 playThroughEarpieceAndroid: false,
 
-                // iOS audio mixing
-                interruptionModeIOS: InterruptionModeIOS.DuckOthers, // Baja el volumen de Spotify
+                // iOS audio mixing - Mix instead of Duck to avoid pausing Spotify
+                interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
 
-                // Android audio mixing
-                interruptionModeAndroid: InterruptionModeAndroid.DuckOthers, // Baja el volumen de Spotify
+                // Android audio mixing - Mix instead of Duck
+                interruptionModeAndroid: InterruptionModeAndroid.DuckOthers, // Keep duck for Android as it works better
             });
 
             isDuckingEnabledRef.current = true;
+            console.log('✅ [SPOTIFY_AUDIO] Audio session configured successfully');
         } catch (error) {
-            console.error('❌ Error configuring audio session:', error);
+            console.error('❌ [SPOTIFY_AUDIO] Error configuring audio session:', error);
         }
     };
 
@@ -44,23 +46,26 @@ export const useSpotifyAudioControl = () => {
     const enableDucking = useCallback(async () => {
         // Si ya está activado, no hacer nada (evita pausas en Spotify)
         if (isDuckingEnabledRef.current) {
+            console.log('🎵 [SPOTIFY_AUDIO] Ducking already enabled, skipping');
             return;
         }
 
         try {
+            console.log('🎵 [SPOTIFY_AUDIO] Enabling audio mixing');
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: false,
                 staysActiveInBackground: true,
                 playsInSilentModeIOS: true,
-                shouldDuckAndroid: true,
+                shouldDuckAndroid: false,
                 playThroughEarpieceAndroid: false,
-                interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+                interruptionModeIOS: InterruptionModeIOS.MixWithOthers, // Mix instead of Duck
                 interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
             });
 
             isDuckingEnabledRef.current = true;
+            console.log('✅ [SPOTIFY_AUDIO] Audio mixing enabled');
         } catch (error) {
-            console.error('❌ Error enabling ducking:', error);
+            console.error('❌ [SPOTIFY_AUDIO] Error enabling ducking:', error);
         }
     }, []);
 
@@ -72,23 +77,26 @@ export const useSpotifyAudioControl = () => {
     const disableDucking = useCallback(async () => {
         // Si ya está desactivado, no hacer nada (evita pausas en Spotify)
         if (!isDuckingEnabledRef.current) {
+            console.log('🎵 [SPOTIFY_AUDIO] Ducking already disabled, skipping');
             return;
         }
 
         try {
+            console.log('🎵 [SPOTIFY_AUDIO] Disabling audio mixing');
             await Audio.setAudioModeAsync({
                 allowsRecordingIOS: false,
                 staysActiveInBackground: true,
                 playsInSilentModeIOS: true,
-                shouldDuckAndroid: false, // Desactiva el ducking
+                shouldDuckAndroid: false,
                 playThroughEarpieceAndroid: false,
-                interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+                interruptionModeIOS: InterruptionModeIOS.MixWithOthers, // Keep mixing
                 interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
             });
 
             isDuckingEnabledRef.current = false;
+            console.log('✅ [SPOTIFY_AUDIO] Audio mixing disabled');
         } catch (error) {
-            console.error('❌ Error disabling ducking:', error);
+            console.error('❌ [SPOTIFY_AUDIO] Error disabling ducking:', error);
         }
     }, []);
 

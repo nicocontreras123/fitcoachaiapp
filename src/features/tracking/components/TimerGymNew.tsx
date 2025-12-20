@@ -28,6 +28,7 @@ import {
     ExerciseProgress,
     SpotifyButton,
 } from './shared';
+import { PrepTimerScreen } from './PrepTimerScreen';
 
 // Helper function to get warmup suggestions for generic exercises
 const getWarmupSuggestion = (exerciseName: string): string | null => {
@@ -88,16 +89,42 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
     const prepSeconds = userData?.prepTimeSeconds !== undefined ? userData.prepTimeSeconds : 10;
     const prepTimeInSeconds = prepMinutes * 60 + prepSeconds;
 
+    // Routine preview data for PrepTimerScreen
+    const routinePreview = React.useMemo(() => ({
+        warmup: warmup.map((ex: any) => ({
+            name: typeof ex === 'object' ? ex.name : ex,
+            duration: typeof ex === 'object' ? ex.duration : 300,
+            description: typeof ex === 'object' ? ex.description : undefined,
+        })),
+        workout: exercises.map((ex: any) => ({
+            name: ex.name,
+            description: ex.description,
+            sets: ex.sets,
+            reps: ex.reps,
+        })),
+        cooldown: cooldown.map((ex: any) => ({
+            name: typeof ex === 'object' ? ex.name : ex,
+            duration: typeof ex === 'object' ? ex.duration : 180,
+            description: typeof ex === 'object' ? ex.description : undefined,
+        })),
+        stats: {
+            duration: `${currentWorkout?.totalDuration || 45} min`,
+            intensity: currentWorkout?.difficulty || 'Intermedia',
+            circuits: `${exercises.length}`,
+        },
+    }), [warmup, exercises, cooldown, currentWorkout]);
+
     // State machine for phase management
     const {
         transitionTo,
         reset: resetPhase,
+        isPreview,
         isPreparing,
         isWarmup,
         isWorkout,
         isCooldown,
         isFinished,
-    } = useTimerStateMachine('preparing');
+    } = useTimerStateMachine('preview');
 
     // Gym-specific timer logic
     const gymTimer = useGymTimer({
@@ -405,12 +432,14 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
     };
 
     const handleReset = () => {
-        resetPhase();
+        // Reset all timers
         gymTimer.reset();
         phaseTimer.reset();
         restTimer.reset();
         preparationTimer.reset();
-        transitionTo('preparing');
+
+        // Transition to preview screen (don't call resetPhase as it goes to 'idle')
+        transitionTo('preview');
     };
 
     const handlePlayPausePhase = () => {
@@ -558,6 +587,29 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
     }
 
     const renderPhase = () => {
+        // PREVIEW PHASE
+        if (isPreview) {
+            return (
+                <PrepTimerScreen
+                    exerciseName={workoutTitle}
+                    timerType="gym"
+                    routinePreview={routinePreview}
+                    onStart={() => {
+                        if (prepTimeInSeconds > 0) {
+                            transitionTo('preparing');
+                            preparationTimer.start();
+                        } else if (warmup.length > 0) {
+                            transitionTo('warmup');
+                        } else {
+                            transitionTo('workout');
+                        }
+                    }}
+                    onBack={() => router.push('/(tabs)/rutinas')}
+                    onEdit={() => router.push('/(tabs)/rutinas')}
+                />
+            );
+        }
+
         // PREPARATION PHASE
         if (isPreparing) {
             return (
@@ -1122,7 +1174,7 @@ export const TimerGymNew: React.FC<GymTimerProps> = ({
     return (
         <View style={styles.container}>
             {renderPhase()}
-            {!isFinished && <SpotifyButton position="top-right" />}
+            {!isFinished && !isPreview && <SpotifyButton position="top-right" />}
         </View>
     );
 };
