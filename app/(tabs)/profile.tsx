@@ -149,6 +149,27 @@ export default function ProfileScreen() {
               />
             </View>
 
+            {/* Motivational Coaching */}
+            <View style={[styles.settingRow, { borderBottomColor: 'rgba(255,255,255,0.05)' }]}>
+              <View style={styles.settingLeft}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(19, 236, 91, 0.2)' }]}>
+                  <MaterialCommunityIcons name="bullhorn" size={20} color="#13ec5b" />
+                </View>
+                <View>
+                  <Text style={[styles.settingText, { color: '#fff' }]}>Coaching Motivacional</Text>
+                  <Text style={{ color: '#9ca3af', fontSize: 12, marginTop: 2 }}>
+                    Frases motivadoras durante la rutina
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={userData?.motivationalCoachingEnabled === true}
+                onValueChange={(value) => updateUserData({ motivationalCoachingEnabled: value })}
+                trackColor={{ false: '#767577', true: '#13ec5b' }}
+                thumbColor={'#fff'}
+              />
+            </View>
+
             {/* Prep Time (Modal Trigger) */}
             <Pressable
               style={styles.settingRow}

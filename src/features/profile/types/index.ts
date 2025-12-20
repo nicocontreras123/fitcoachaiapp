@@ -37,6 +37,7 @@ export interface UserData {
   // Audio settings
   voiceEnabled?: boolean; // Default: true
   timerSoundEnabled?: boolean; // Default: true
+  motivationalCoachingEnabled?: boolean; // Default: false - Coaching motivacional adicional
   photoUrl?: string;
 }
 

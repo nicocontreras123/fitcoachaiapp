@@ -13,6 +13,7 @@ import { useBoxeoTimer } from '../hooks/useBoxeoTimer';
 import { useTimerStateMachine } from '../hooks/useTimerStateMachine';
 import { usePhaseTimer } from '../hooks/usePhaseTimer';
 import { useAudioManager } from '../hooks/useAudioManager';
+import { useMotivationalCoaching } from '../hooks/useMotivationalCoaching';
 import {
     useBoxingPhaseHandlers,
     useWorkoutExercises,
@@ -143,6 +144,9 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
         voiceEnabled: userData?.voiceEnabled !== false,
         timerSoundEnabled: !isSoundMuted && userData?.timerSoundEnabled !== false,
     });
+
+    // Motivational Coaching
+    const motivationalCoaching = useMotivationalCoaching();
 
     // Create ref for finish workout handler (defined later)
     const finishWorkoutHandlerRef = useRef<(() => void) | undefined>(undefined);
@@ -379,6 +383,52 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
             onTimeUpdate(totalElapsedTime);
         }
     }, [totalElapsedTime, onTimeUpdate]);
+
+    // Motivational Coaching - Speak phrases at key moments
+    const hasSpokenMidWorkoutRef = useRef(false);
+    const hasSpokenLastRoundRef = useRef(false);
+    const lastRestRoundRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        if (!motivationalCoaching.isEnabled || !isWorkout) return;
+
+        const totalRounds = workoutRounds?.length || 12;
+
+        // Between rounds - when entering rest period
+        if (isRest && round !== lastRestRoundRef.current) {
+            lastRestRoundRef.current = round;
+            const phrase = motivationalCoaching.getBetweenRoundsPhrase();
+            if (phrase) {
+                console.log('🎯 [MOTIVATIONAL] Between rounds:', phrase);
+                // Delay slightly to not overlap with other announcements
+                setTimeout(() => audio.speak(phrase), 1500);
+            }
+        }
+
+        // Mid workout - around 50% completion
+        const midRound = Math.ceil(totalRounds / 2);
+        if (round === midRound && !isRest && !hasSpokenMidWorkoutRef.current) {
+            hasSpokenMidWorkoutRef.current = true;
+            const phrase = motivationalCoaching.getMidWorkoutPhrase();
+            if (phrase) {
+                console.log('🎯 [MOTIVATIONAL] Mid workout:', phrase);
+                setTimeout(() => audio.speak(phrase), 1500);
+            }
+        }
+
+        // Last round - when entering last round or rest before last round
+        const isLastRound = round === totalRounds;
+        const isRestBeforeLastRound = isRest && round === totalRounds - 1;
+
+        if ((isLastRound || isRestBeforeLastRound) && !hasSpokenLastRoundRef.current) {
+            hasSpokenLastRoundRef.current = true;
+            const phrase = motivationalCoaching.getLastRoundPhrase();
+            if (phrase) {
+                console.log('🎯 [MOTIVATIONAL] Last round:', phrase);
+                setTimeout(() => audio.speak(phrase), 1500);
+            }
+        }
+    }, [isWorkout, isRest, round, motivationalCoaching, audio, workoutRounds]);
 
     // Call onComplete callback when finished - DISABLED: Was causing navigation before modal shows
     // useEffect(() => {

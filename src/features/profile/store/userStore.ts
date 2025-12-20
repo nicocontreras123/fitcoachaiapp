@@ -56,6 +56,7 @@ export const useUserStore = create<UserStore>((set, get) => ({
             equipment: backendUser.equipment || [],
             voiceEnabled: backendUser.voiceEnabled ?? true,
             timerSoundEnabled: backendUser.timerSoundEnabled ?? true,
+            motivationalCoachingEnabled: backendUser.motivationalCoachingEnabled ?? false,
             prepTimeMinutes: backendUser.prepTimeMinutes ?? 0,
             prepTimeSeconds: backendUser.prepTimeSeconds ?? 10,
             hasCompletedOnboarding: backendUser.hasCompletedOnboarding ?? false,
