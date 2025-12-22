@@ -59,7 +59,6 @@ module.exports = ({ config }) => ({
             {
                 icon: "./assets/icon.png",
                 color: "#102216",
-                sounds: ["default"],
                 mode: "production"
             }
         ],
