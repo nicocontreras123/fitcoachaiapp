@@ -8,6 +8,7 @@ import { useWorkoutStore } from '../store/useWorkoutStore';
 import { useUserStore } from '@/features/profile/store/userStore';
 import { COLORS } from '@/constants/theme';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { NotificationService } from '@/services/notificationService';
 
 const DAY_NAMES: Record<string, string> = {
     'lunes': 'LUN',
@@ -38,6 +39,28 @@ export default function RutinasScreen() {
 
             loadWeeklyRoutine();
         }
+    }, []);
+
+    // Solicitar permisos de notificaciones al montar el componente
+    React.useEffect(() => {
+        const setupNotifications = async () => {
+            const hasPermission = await NotificationService.requestPermissions();
+            if (hasPermission) {
+                console.log('✅ Notification permissions granted');
+
+                // Schedule week-end reminder if not already scheduled
+                await NotificationService.scheduleWeekEndReminder();
+
+                // If there's a current routine, schedule daily reminders
+                if (currentWeeklyRoutine) {
+                    await NotificationService.scheduleDailyWorkoutReminders(currentWeeklyRoutine);
+                }
+            } else {
+                console.log('⚠️ Notification permissions denied');
+            }
+        };
+
+        setupNotifications();
     }, []);
 
     // Find today's workout

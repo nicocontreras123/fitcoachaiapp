@@ -22,6 +22,7 @@ module.exports = ({ config }) => ({
         infoPlist: {
             NSLocationWhenInUseUsageDescription: "FitCoach AI needs your location to track your running workouts and provide accurate distance and pace information.",
             NSMicrophoneUsageDescription: "FitCoach AI needs microphone access to provide voice feedback during your workouts.",
+            NSUserNotificationsUsageDescription: "FitCoach AI needs permission to send you reminders about your daily workouts and weekly routine updates.",
             LSApplicationQueriesSchemes: ["spotify"]
         }
     },
@@ -38,7 +39,8 @@ module.exports = ({ config }) => ({
             "ACCESS_BACKGROUND_LOCATION",
             "FOREGROUND_SERVICE",
             "FOREGROUND_SERVICE_LOCATION",
-            "RECORD_AUDIO"
+            "RECORD_AUDIO",
+            "POST_NOTIFICATIONS"
         ]
     },
     web: {
@@ -50,6 +52,15 @@ module.exports = ({ config }) => ({
             "expo-location",
             {
                 locationAlwaysAndWhenInUsePermission: "Allow FitCoach AI to use your location to track running workouts."
+            }
+        ],
+        [
+            "expo-notifications",
+            {
+                icon: "./assets/icon.png",
+                color: "#102216",
+                sounds: ["default"],
+                mode: "production"
             }
         ],
         "expo-font",

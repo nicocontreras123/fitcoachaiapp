@@ -4,6 +4,7 @@ import { OpenAIService } from '@/services/openaiApi';
 import { StorageService, STORAGE_KEYS } from '@/services/storage';
 import { isApiConfigured } from '@/config/env';
 import { weeklyRoutineApi } from '@/services/weeklyRoutineApi';
+import { NotificationService } from '@/services/notificationService';
 
 interface WorkoutStore {
     currentWorkout: Workout | null;
@@ -63,6 +64,15 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
             }
 
             set({ currentWeeklyRoutine: routine, isGenerating: false });
+
+            // Schedule notifications for the new routine
+            try {
+                await NotificationService.scheduleWeekEndReminder();
+                await NotificationService.scheduleDailyWorkoutReminders(routine);
+                console.log('✅ Notifications scheduled successfully');
+            } catch (notificationError: any) {
+                console.warn('⚠️ Failed to schedule notifications:', notificationError.message);
+            }
 
         } catch (error: any) {
             console.error('❌ Error generating routine:', error);

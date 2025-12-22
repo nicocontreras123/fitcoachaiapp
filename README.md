@@ -22,6 +22,20 @@ Aplicación móvil de entrenamiento personal impulsada por IA, desarrollada con 
 - Persistencia con AsyncStorage
 - Validación con Zod schemas
 
+### ✅ Sistema de Notificaciones
+
+- **Notificaciones de fin de semana**: Domingo a las 8:00 PM para recordar generar nueva rutina
+- **Notificaciones diarias**: 7:00 AM en días con entrenamiento programado
+- Permisos automáticos en iOS y Android
+- Configuración de canales de notificación (Android)
+- Programación automática al generar rutinas semanales
+
+**Archivos relacionados:**
+- `src/services/notificationService.ts`: Servicio principal de notificaciones
+- `app.config.js`: Configuración de permisos y plugin de expo-notifications
+- `src/features/workouts/store/useWorkoutStore.ts`: Integración con generación de rutinas
+- `src/features/workouts/screens/RutinasScreen.tsx`: Solicitud de permisos
+
 ### 🏗️ Próximas Features
 
 - Generación de rutinas con OpenAI
