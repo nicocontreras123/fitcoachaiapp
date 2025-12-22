@@ -67,8 +67,19 @@ module.exports = ({ config }) => ({
         "expo-web-browser",
         "expo-audio",
         "expo-asset",
-        "@react-native-firebase/app",
-        "@react-native-firebase/crashlytics"
+        [
+            "@react-native-firebase/app",
+            {
+                // Firebase configured only for Android (google-services.json exists)
+                // For iOS: download GoogleService-Info.plist from Firebase Console
+            }
+        ],
+        [
+            "@react-native-firebase/crashlytics",
+            {
+                // Crashlytics enabled for Android only
+            }
+        ]
     ],
     scheme: "fitcoach",
     experiments: {
