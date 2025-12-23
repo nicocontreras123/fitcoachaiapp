@@ -176,9 +176,9 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
         let interval: ReturnType<typeof setInterval>;
 
         if (state.isActive && state.timeLeft > 0) {
-            
+
             interval = setInterval(() => {
-                
+
                 dispatch({ type: 'TICK' });
             }, 1000);
         } else {
@@ -189,7 +189,7 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
 
         return () => {
             if (interval) {
-                
+
                 clearInterval(interval);
             }
         };
@@ -209,6 +209,23 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
             hasSpokenCountdownRef.current.clear();
         }
     }, [state.timeLeft, state.isActive, audio]);
+
+    // Announce "Prepárate" at 10 seconds during rest
+    const hasSpokenPrepareRef = useRef(false);
+
+    useEffect(() => {
+        // Only announce during rest period
+        if (state.isRest && state.isActive && state.timeLeft === 10 && !hasSpokenPrepareRef.current) {
+            audio.speak('Prepárate', { language: 'es-ES', pitch: 1.1, rate: 0.9 });
+            hasSpokenPrepareRef.current = true;
+            console.log('🗣️ [REST_PREPARE] Announced "Prepárate" at 10 seconds');
+        }
+
+        // Reset the flag when not in rest or when time changes significantly
+        if (!state.isRest || state.timeLeft > 10) {
+            hasSpokenPrepareRef.current = false;
+        }
+    }, [state.isRest, state.isActive, state.timeLeft, audio]);
 
     // Phase change when time reaches 0
     useEffect(() => {
@@ -270,10 +287,12 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
     const resetTimer = useCallback(() => {
         dispatch({ type: 'RESET', payload: { prepTime, totalRounds } });
         hasSpokenCountdownRef.current.clear();
+        hasSpokenPrepareRef.current = false;
     }, [prepTime, totalRounds]);
 
     const skipToNextRound = useCallback(() => {
         hasSpokenCountdownRef.current.clear();
+        hasSpokenPrepareRef.current = false;
 
         if (state.isPreparing) {
             // Skip preparation, go straight to round 1

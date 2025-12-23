@@ -33,7 +33,7 @@ export const useGpsTracker = () => {
         (async () => {
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
-                setErrorMsg('Permission to access location was denied');
+                setErrorMsg('Permiso para acceder a la ubicación denegado');
                 return;
             }
 
@@ -61,12 +61,12 @@ export const useGpsTracker = () => {
                 distanceInterval: 10,
                 foregroundService: {
                     notificationTitle: "FitCoach AI",
-                    notificationBody: "Tracking your run..."
+                    notificationBody: "Rastreando tu carrera..."
                 }
             });
         } catch (e) {
             console.warn("⚠️ Failed to start background location updates:", e);
-            setErrorMsg("Could not start background tracking. Using foreground only.");
+            setErrorMsg("No se pudo iniciar el rastreo en segundo plano. Usando solo primer plano.");
         }
 
         try {

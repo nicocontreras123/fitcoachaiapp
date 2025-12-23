@@ -8,6 +8,7 @@ import {
   RunningWorkout,
   BoxingExercise,
 } from '@/features/workouts/types';
+import { detectWorkoutObjective, getWarmupTemplates, getCooldownTemplates, type FitnessLevel } from './warmupTemplates';
 
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -216,16 +217,28 @@ DURACIONES MÍNIMAS OBLIGATORIAS:
 BOXEO:
 * Beginner: 30-35 min total
   - Warmup: 5-7 min (300-420 segundos totales)
+    → 2-3 ejercicios: cardio ligero + movilidad
   - Rounds: 4-6 rounds × (120s trabajo + 60s descanso)
   - Cooldown: 3-5 min (180-300 segundos totales)
 
 * Intermediate: 40-50 min total
-  - Warmup: 6-8 min (360-480 segundos totales)
+  - Warmup: 10-12 min (600-720 segundos totales) ⚠️ OBLIGATORIO
+    → 3-4 ejercicios DIFERENTES:
+      1. Cardio (5-7 min): Cuerda, trote, jumping jacks
+      2. Movilidad dinámica (2-3 min): Rotaciones, arm circles, leg swings
+      3. Shadow boxing suave (3-5 min): Técnica, footwork, combinaciones lentas
+    → NUNCA un solo ejercicio de 7 min
   - Rounds: 8-12 rounds × (180s trabajo + 60s descanso)
   - Cooldown: 4-6 min (240-360 segundos totales)
 
 * Advanced: 50-60 min total
-  - Warmup: 7-10 min (420-600 segundos totales)
+  - Warmup: 12-15 min (720-900 segundos totales) ⚠️ OBLIGATORIO
+    → 4-5 ejercicios DIFERENTES:
+      1. Cardio intenso (5-7 min): Cuerda doble, burpees, high knees
+      2. Movilidad dinámica (3-4 min): Rotaciones complejas, inchworms
+      3. Shadow boxing técnico (3-5 min): Combinaciones, footwork avanzado
+      4. Activación específica (2-3 min): Planchas, core, explosividad
+    → NUNCA menos de 4 ejercicios
   - Rounds: 12-18 rounds × (180s trabajo + 60s descanso)
   - Cooldown: 5-8 min (300-480 segundos totales)
 
@@ -246,12 +259,12 @@ GYM:
 * Intermediate: 45-55 min total (8-10 ejercicios × 3-4 sets)
 * Advanced: 55-70 min total (10-12 ejercicios × 4-5 sets)
 
-EJEMPLO CÁLCULO CORRECTO (Intermediate Boxing 45min):
-1. Warmup: 3 ejercicios = 180s + 120s + 60s = 360s = 6min
+EJEMPLO CÁLCULO CORRECTO (Intermediate Boxing 48min):
+1. Warmup: 4 ejercicios = 300s (cuerda) + 120s (movilidad) + 180s (shadow) + 60s (activación) = 660s = 11min
 2. Rounds: 10 rounds × 180s = 1800s = 30min trabajo
 3. Descansos: 9 × 60s = 540s = 9min
 4. Cooldown: 3 ejercicios = 60s + 60s + 60s = 180s = 3min
-5. Total = 6 + 30 + 9 + 3 = 48min ✅
+5. Total = 11 + 30 + 9 + 3 = 53min ✅
 
 EJEMPLO INCORRECTO (NO hacer):
 1. Warmup: 2 ejercicios = 90s + 60s = 150s = 2.5min
@@ -472,12 +485,90 @@ function ensureMinimumDuration(workout: Workout, level: string): Workout {
   return workout;
 }
 
+// ============= WARMUP VALIDATION =============
+function ensureProperWarmup(workout: Workout, level: string): Workout {
+  if (!('rounds' in workout)) return workout; // Only for boxing
+
+  const boxing = workout as BoxingWorkout;
+  const minExercises = level === 'beginner' ? 2 : level === 'intermediate' ? 3 : 4;
+  const minDuration = level === 'beginner' ? 300 : level === 'intermediate' ? 600 : 720;
+
+  // Check if warmup needs enhancement
+  if (boxing.warmup.length < minExercises) {
+    console.warn(`⚠️ Warmup too short: ${boxing.warmup.length} exercises < ${minExercises} (${level})`);
+
+    // Detect workout objective
+    const objective = detectWorkoutObjective(boxing.title, boxing.description);
+    console.log(`🎯 Detected workout objective: ${objective}`);
+
+    // Get appropriate templates
+    const templates = getWarmupTemplates(level as FitnessLevel, objective);
+
+    // Add exercises that aren't already in warmup
+    templates.forEach(template => {
+      const alreadyHas = boxing.warmup.some(ex =>
+        ex.name.toLowerCase().includes(template.name.toLowerCase().split(' ')[0])
+      );
+
+      if (!alreadyHas && boxing.warmup.length < minExercises + 1) { // +1 for flexibility
+        boxing.warmup.push(template);
+      }
+    });
+
+    // Recalculate duration
+    boxing.totalDuration = calculateBoxingDuration(boxing);
+    console.log(`✅ Enhanced warmup (${objective}): ${boxing.warmup.length} exercises, ${boxing.warmup.reduce((s, e) => s + e.duration, 0)}s total`);
+  }
+
+  return boxing;
+}
+
+// ============= COOLDOWN VALIDATION =============
+function ensureProperCooldown(workout: Workout, level: string): Workout {
+  if (!('rounds' in workout)) return workout; // Only for boxing
+
+  const boxing = workout as BoxingWorkout;
+  const minExercises = level === 'beginner' ? 2 : level === 'intermediate' ? 3 : 4;
+  const minDuration = level === 'beginner' ? 180 : level === 'intermediate' ? 240 : 300;
+
+  // Check if cooldown needs enhancement
+  if (boxing.cooldown.length < minExercises) {
+    console.warn(`⚠️ Cooldown too short: ${boxing.cooldown.length} exercises < ${minExercises} (${level})`);
+
+    // Detect workout objective
+    const objective = detectWorkoutObjective(boxing.title, boxing.description);
+
+    // Get appropriate templates
+    const templates = getCooldownTemplates(level as FitnessLevel, objective);
+
+    // Add exercises that aren't already in cooldown
+    templates.forEach(template => {
+      const alreadyHas = boxing.cooldown.some(ex =>
+        ex.name.toLowerCase().includes(template.name.toLowerCase().split(' ')[0])
+      );
+
+      if (!alreadyHas && boxing.cooldown.length < minExercises + 1) { // +1 for flexibility
+        boxing.cooldown.push(template);
+      }
+    });
+
+    // Recalculate duration
+    boxing.totalDuration = calculateBoxingDuration(boxing);
+    console.log(`✅ Enhanced cooldown (${objective}): ${boxing.cooldown.length} exercises, ${boxing.cooldown.reduce((s, e) => s + e.duration, 0)}s total`);
+  }
+
+  return boxing;
+}
+
+
 // ============= POST-PROCESSOR =============
 class WorkoutPostProcessor {
   static process(routine: WeeklyRoutine, level: string): WeeklyRoutine {
     Object.keys(routine.days).forEach(dayKey => {
       const day = routine.days[dayKey];
       if (!day.restDay && day.workout) {
+        day.workout = ensureProperWarmup(day.workout, level);
+        day.workout = ensureProperCooldown(day.workout, level);
         day.workout = validateAndFixWorkoutDuration(day.workout);
         day.workout = ensureMinimumDuration(day.workout, level);
       }

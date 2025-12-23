@@ -607,6 +607,10 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
             return Math.max(0, Math.ceil(exerciseDuration - exerciseTimeElapsed));
         })();
 
+        // Get next round exercises for rest period display
+        const nextRoundInfo = workoutRounds?.[round]; // round is 1-indexed, array is 0-indexed, so round gives us next round
+        const nextRoundExercises = nextRoundInfo?.exercises || [];
+
         return (
             <WorkoutPhase
                 isPreparing={isPreparing}
@@ -616,6 +620,7 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
                 totalRounds={state.totalRounds || 12}
                 currentExercise={currentExercise}
                 exercises={exercises}
+                nextRoundExercises={nextRoundExercises}
                 currentExerciseIndex={currentExerciseIndex}
                 combinationTimeLeft={combinationTimeLeft}
                 phaseColors={phaseColors}

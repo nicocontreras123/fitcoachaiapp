@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, StatusBar, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatTime } from '@/utils/timeUtils';
 import { ExerciseCard, BlurHeader, IntensityBar } from '@/components/timer';
 import { TimerControls } from '../../shared';
+import { calculateExerciseIntensity } from '@/features/tracking/utils/exerciseIntensity';
 
 interface WorkoutPhaseProps {
     isPreparing: boolean;
@@ -13,6 +14,7 @@ interface WorkoutPhaseProps {
     totalRounds: number;
     currentExercise: any;
     exercises: any[];
+    nextRoundExercises?: any[]; // Exercises for the next round (shown during rest)
     currentExerciseIndex: number;
     combinationTimeLeft: number;
     phaseColors: {
@@ -40,6 +42,7 @@ export const WorkoutPhase: React.FC<WorkoutPhaseProps> = ({
     totalRounds,
     currentExercise,
     exercises,
+    nextRoundExercises,
     currentExerciseIndex,
     combinationTimeLeft,
     phaseColors,
@@ -54,6 +57,15 @@ export const WorkoutPhase: React.FC<WorkoutPhaseProps> = ({
     onReset,
     showSkipButton = true,
 }) => {
+    // Calculate dynamic intensity based on current exercise
+    const currentIntensity = useMemo(() => {
+        if (isPreparing) return 0;
+        if (isRest) return 30;
+        if (!currentExercise) return 70; // Default
+
+        return calculateExerciseIntensity(currentExercise.name, currentExercise.description);
+    }, [isPreparing, isRest, currentExercise]);
+
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: phaseColors.bg }]} edges={['top', 'left', 'right']}>
             <StatusBar hidden />
@@ -132,17 +144,23 @@ export const WorkoutPhase: React.FC<WorkoutPhaseProps> = ({
                 {isRest && (
                     <View style={styles.nextRoundContainer}>
                         <Text style={[styles.nextRoundTitle, { color: phaseColors.primary }]}>
-                            Siguiente Round
+                            {nextRoundExercises && nextRoundExercises.length > 0 ? 'Siguiente Round' : 'Último Round'}
                         </Text>
-                        <Text style={styles.nextRoundSubtitle}>Prepárate para estos ejercicios</Text>
-                        <View style={styles.exercisesList}>
-                            {exercises.map((exercise, index) => (
-                                <View key={index} style={styles.exerciseItem}>
-                                    <View style={[styles.exerciseDot, { backgroundColor: phaseColors.primary }]} />
-                                    <Text style={styles.exerciseItemText}>{exercise.name}</Text>
-                                </View>
-                            ))}
-                        </View>
+                        <Text style={styles.nextRoundSubtitle}>
+                            {nextRoundExercises && nextRoundExercises.length > 0
+                                ? 'Prepárate para estos ejercicios'
+                                : '¡Bien hecho! Este fue el último round'}
+                        </Text>
+                        {nextRoundExercises && nextRoundExercises.length > 0 && (
+                            <View style={styles.exercisesList}>
+                                {nextRoundExercises.map((exercise, index) => (
+                                    <View key={index} style={styles.exerciseItem}>
+                                        <View style={[styles.exerciseDot, { backgroundColor: phaseColors.primary }]} />
+                                        <Text style={styles.exerciseItemText}>{exercise.name}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
                     </View>
                 )}
 
@@ -159,7 +177,7 @@ export const WorkoutPhase: React.FC<WorkoutPhaseProps> = ({
             {/* Controls */}
             <View style={styles.controlsContainer}>
                 <IntensityBar
-                    intensity={isPreparing ? 0 : isRest ? 30 : 78}
+                    intensity={currentIntensity}
                     label="Intensidad"
                     color={phaseColors.primary}
                 />

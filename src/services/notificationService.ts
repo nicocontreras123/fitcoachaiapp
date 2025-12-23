@@ -41,7 +41,7 @@ export class NotificationService {
       // Configure notification channel for Android
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('workout-reminders', {
-          name: 'Workout Reminders',
+          name: 'Recordatorios de Entrenamiento',
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#102216',

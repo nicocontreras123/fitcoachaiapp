@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CircularProgress, StatCard } from '@/components/timer';
 import { RunningWorkout } from '@/features/workouts/types';
 import { useRunningTimer } from '@/features/tracking/hooks/useRunningTimer';
+import { useBackgroundAudioWithMixing } from '@/features/tracking/hooks/useBackgroundAudio';
 import { SpotifyButton } from '@/features/tracking/components/shared';
 
 interface RunningTrackerProps {
@@ -14,6 +15,9 @@ interface RunningTrackerProps {
 }
 
 export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTrackerProps) {
+    // Enable background audio for voice coaching
+    useBackgroundAudioWithMixing();
+
     const timer = useRunningTimer({
         workout,
         prepTime: 10,

@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RunningWorkout } from '@/features/workouts/types';
 import { useGpsTracker } from './useGpsTracker';
 import { useAudioManager } from './useAudioManager';
+import { useBackgroundTimer } from './useBackgroundTimer';
 
 const STORAGE_KEY = 'running_workout_progress';
 
@@ -36,6 +38,9 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
         timerSoundEnabled: true,
     });
 
+    // Initialize background timer
+    const backgroundTimer = useBackgroundTimer();
+
     // Timer state
     const [state, setState] = useState<RunningTimerState>({
         phase: 'idle',
@@ -48,7 +53,8 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
         notes: '',
     });
 
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const appState = useRef(AppState.currentState);
     const hasAnnouncedIntervalRef = useRef(false);
     const lastSaveTimeRef = useRef(Date.now());
 
@@ -117,6 +123,47 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
         }
     }, [state.timeLeft, state.phase, state.isPaused]);
 
+    // Handle app state changes - sync time when returning from background
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
+            console.log('🏃 [RUNNING_TIMER] AppState changed:', {
+                from: appState.current,
+                to: nextAppState,
+                phase: state.phase,
+                isPaused: state.isPaused,
+            });
+
+            // App is coming to foreground
+            if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+                if (state.phase === 'active' && !state.isPaused) {
+                    // Get elapsed time including background time
+                    const totalElapsed = await backgroundTimer.getElapsedTime();
+
+                    console.log('🏃 [RUNNING_TIMER] Syncing time from background:', {
+                        previousElapsed: state.totalElapsedTime,
+                        newElapsed: totalElapsed,
+                        difference: totalElapsed - state.totalElapsedTime,
+                    });
+
+                    // Update state with background time
+                    setState(prev => ({
+                        ...prev,
+                        totalElapsedTime: totalElapsed,
+                    }));
+
+                    // Restart background timer tracking with new time
+                    await backgroundTimer.startBackgroundTimer(totalElapsed);
+                }
+            }
+
+            appState.current = nextAppState;
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [state.phase, state.isPaused, state.totalElapsedTime, backgroundTimer]);
+
     // Announce interval when starting
     useEffect(() => {
         if (
@@ -181,6 +228,9 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
             // Start GPS tracking
             await gps.startTracking();
 
+            // Start background timer tracking
+            await backgroundTimer.startBackgroundTimer(0);
+
             // Set preparing phase - timer will countdown automatically
             setState(prev => ({
                 ...prev,
@@ -190,25 +240,32 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
 
             // No need for setTimeout - the timer effect will handle the transition when timeLeft reaches 0
         }
-    }, [state.phase, prepTime]);
+    }, [state.phase, prepTime, backgroundTimer]);
 
-    const pause = useCallback(() => {
+    const pause = useCallback(async () => {
         if ((state.phase === 'preparing' || state.phase === 'active') && !state.isPaused) {
             setState(prev => ({ ...prev, isPaused: true }));
             audio.stopTickSound();
             audio.speak('Pausado');
+
+            // Pause background timer
+            await backgroundTimer.pauseBackgroundTimer(state.totalElapsedTime);
+
             if (state.phase === 'active') {
                 saveProgress();
             }
         }
-    }, [state.phase, state.isPaused]);
+    }, [state.phase, state.isPaused, state.totalElapsedTime, backgroundTimer]);
 
-    const resume = useCallback(() => {
+    const resume = useCallback(async () => {
         if (state.isPaused) {
             setState(prev => ({ ...prev, isPaused: false }));
             audio.speak('Continuando');
+
+            // Resume background timer
+            await backgroundTimer.startBackgroundTimer(state.totalElapsedTime);
         }
-    }, [state.isPaused]);
+    }, [state.isPaused, state.totalElapsedTime, backgroundTimer]);
 
     const skip = useCallback(() => {
         if (state.currentIntervalIndex < intervals.length - 1) {
@@ -247,6 +304,8 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
 
     const reset = useCallback(async () => {
         await gps.stopTracking();
+        await backgroundTimer.stopBackgroundTimer();
+
         setState({
             phase: 'idle',
             currentIntervalIndex: 0,
@@ -259,7 +318,7 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
         });
         clearProgress();
         hasAnnouncedIntervalRef.current = false;
-    }, [prepTime]);
+    }, [prepTime, backgroundTimer]);
 
     const saveProgress = async () => {
         try {

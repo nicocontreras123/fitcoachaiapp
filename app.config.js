@@ -21,9 +21,14 @@ module.exports = ({ config }) => ({
         bundleIdentifier: "com.fitcoach.ai",
         infoPlist: {
             NSLocationWhenInUseUsageDescription: "FitCoach AI needs your location to track your running workouts and provide accurate distance and pace information.",
+            NSLocationAlwaysAndWhenInUseUsageDescription: "FitCoach AI needs your location in the background to continue tracking your running workouts when the screen is locked.",
             NSMicrophoneUsageDescription: "FitCoach AI needs microphone access to provide voice feedback during your workouts.",
             NSUserNotificationsUsageDescription: "FitCoach AI needs permission to send you reminders about your daily workouts and weekly routine updates.",
-            LSApplicationQueriesSchemes: ["spotify"]
+            LSApplicationQueriesSchemes: ["spotify"],
+            UIBackgroundModes: [
+                "audio",
+                "location"
+            ]
         }
     },
     android: {
