@@ -1,16 +1,17 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Animated, PanResponder, Dimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSpotifyAudioControl } from '../../hooks/useSpotifyAudioControl';
+import { useUserStore } from '@/features/profile/store/userStore';
+import { openMusicApp, getMusicAppConfig, detectInstalledMusicApps, MusicApp } from '@/services/musicAppService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-interface SpotifyButtonProps {
+interface MusicAppButtonProps {
     position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
     style?: any;
 }
 
-const getInitialPosition = (position: SpotifyButtonProps['position']) => {
+const getInitialPosition = (position: MusicAppButtonProps['position']) => {
     switch (position) {
         case 'top-left':
             return { x: 16, y: 80 };
@@ -25,13 +26,45 @@ const getInitialPosition = (position: SpotifyButtonProps['position']) => {
     }
 };
 
-export function SpotifyButton({ position = 'top-right', style }: SpotifyButtonProps) {
-    const { openSpotify } = useSpotifyAudioControl();
+export function MusicAppButton({ position = 'top-right', style }: MusicAppButtonProps) {
+    const { userData } = useUserStore();
+    const [shouldShow, setShouldShow] = useState(false);
+    const [appConfig, setAppConfig] = useState<ReturnType<typeof getMusicAppConfig>>(null);
+
     const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
     // Get initial position based on prop
     const initialPosition = getInitialPosition(position);
     const pan = React.useRef(new Animated.ValueXY(initialPosition)).current;
+
+    // Check if user has a preferred app and if it's installed
+    useEffect(() => {
+        const checkMusicApp = async () => {
+            const preferredApp = userData?.preferredMusicApp;
+
+            if (!preferredApp) {
+                console.log('🎵 [MUSIC_BUTTON] No preferred music app configured');
+                setShouldShow(false);
+                return;
+            }
+
+            // Detect installed apps
+            const installedApps = await detectInstalledMusicApps();
+
+            // Check if preferred app is installed
+            if (installedApps.includes(preferredApp)) {
+                const config = getMusicAppConfig(preferredApp);
+                setAppConfig(config);
+                setShouldShow(true);
+                console.log(`🎵 [MUSIC_BUTTON] Showing ${config?.name} button`);
+            } else {
+                console.log(`⚠️ [MUSIC_BUTTON] Preferred app ${preferredApp} not installed`);
+                setShouldShow(false);
+            }
+        };
+
+        checkMusicApp();
+    }, [userData?.preferredMusicApp]);
 
     const panResponder = React.useRef(
         PanResponder.create({
@@ -59,8 +92,8 @@ export function SpotifyButton({ position = 'top-right', style }: SpotifyButtonPr
                 // Check if it was a tap (minimal movement)
                 const isTap = Math.abs(gesture.dx) < 10 && Math.abs(gesture.dy) < 10;
 
-                if (isTap) {
-                    openSpotify();
+                if (isTap && userData?.preferredMusicApp) {
+                    openMusicApp(userData.preferredMusicApp);
                 }
 
                 Animated.spring(scaleAnim, {
@@ -90,6 +123,11 @@ export function SpotifyButton({ position = 'top-right', style }: SpotifyButtonPr
         })
     ).current;
 
+    // Don't render if no app is configured or installed
+    if (!shouldShow || !appConfig) {
+        return null;
+    }
+
     return (
         <Animated.View
             {...panResponder.panHandlers}
@@ -105,14 +143,17 @@ export function SpotifyButton({ position = 'top-right', style }: SpotifyButtonPr
                 style,
             ]}
         >
-            <View style={styles.button}>
+            <View style={[styles.button, { borderColor: appConfig.color }]}>
                 <View style={styles.iconContainer}>
-                    <MaterialCommunityIcons name="spotify" size={28} color="#1DB954" />
+                    <MaterialCommunityIcons name={appConfig.icon as any} size={28} color={appConfig.color} />
                 </View>
             </View>
         </Animated.View>
     );
 }
+
+// Keep SpotifyButton as alias for backward compatibility
+export const SpotifyButton = MusicAppButton;
 
 const styles = StyleSheet.create({
     container: {
@@ -127,8 +168,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
-        borderColor: '#1DB954',
-        shadowColor: '#1DB954',
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.4,
         shadowRadius: 12,

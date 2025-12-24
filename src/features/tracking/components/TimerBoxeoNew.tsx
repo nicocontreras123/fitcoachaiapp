@@ -258,6 +258,8 @@ export const TimerBoxeoNew: React.FC<TimerBoxeoProps> = ({
         transitionTo,
     });
 
+
+
     // Timer controls
     const { handlePlayPress, handleSkipExercise, handleResetRoutine, handleBack, handleMuteToggle } = useTimerControls({
         userHasStarted,

@@ -38,6 +38,8 @@ export interface UserData {
   voiceEnabled?: boolean; // Default: true
   timerSoundEnabled?: boolean; // Default: true
   motivationalCoachingEnabled?: boolean; // Default: false - Coaching motivacional adicional
+  // Music app preference
+  preferredMusicApp?: 'spotify' | 'youtube-music' | 'apple-music' | null;
   photoUrl?: string;
 }
 

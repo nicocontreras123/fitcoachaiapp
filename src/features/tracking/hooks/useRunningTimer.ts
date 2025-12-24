@@ -63,43 +63,76 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
         loadProgress();
     }, []);
 
-    // Main timer loop - now includes preparing phase
+    // Main timer loop
     useEffect(() => {
+        console.log('🏃 [RUNNING_TIMER] Timer effect triggered:', {
+            phase: state.phase,
+            isPaused: state.isPaused,
+        });
+
         // Run timer during preparing AND active phases
-        if ((state.phase === 'preparing' || state.phase === 'active') && !state.isPaused && state.timeLeft > 0) {
+        if ((state.phase === 'preparing' || state.phase === 'active') && !state.isPaused) {
+            console.log('🏃 [RUNNING_TIMER] Starting interval');
+
             timerRef.current = setInterval(() => {
-                setState(prev => ({
-                    ...prev,
-                    timeLeft: prev.timeLeft - 1,
-                    // Only increment total elapsed time during active phase
-                    totalElapsedTime: prev.phase === 'active' ? prev.totalElapsedTime + 1 : prev.totalElapsedTime,
-                }));
+                setState(prev => {
+                    // Don't tick if already at 0
+                    if (prev.timeLeft <= 0) return prev;
+
+                    if (prev.phase === 'active') {
+                        console.log('🏃 [RUNNING_TIMER] Active phase tick');
+                        return {
+                            ...prev,
+                            timeLeft: prev.timeLeft - 1,
+                            totalElapsedTime: prev.totalElapsedTime + 1,
+                        };
+                    } else {
+                        console.log('🏃 [RUNNING_TIMER] Preparing phase tick');
+                        return {
+                            ...prev,
+                            timeLeft: prev.timeLeft - 1,
+                        };
+                    }
+                });
             }, 1000);
-        } else if (state.timeLeft === 0) {
-            // Handle timeLeft reaching 0 in both preparing and active phases
-            if (state.phase === 'preparing') {
-                // Preparation finished, start first interval
-                const firstInterval = intervals[0];
-                setState(prev => ({
-                    ...prev,
-                    phase: 'active',
-                    currentIntervalIndex: 0,
-                    timeLeft: firstInterval.duration * 60,
-                }));
-                audio.playBell();
-                audio.speak('¡Comienza!');
-            } else if (state.phase === 'active') {
-                handleIntervalComplete();
-            }
         }
 
         return () => {
             if (timerRef.current) {
+                console.log('🏃 [RUNNING_TIMER] Clearing interval');
                 clearInterval(timerRef.current);
                 timerRef.current = null;
             }
         };
-    }, [state.phase, state.isPaused, state.timeLeft]);
+    }, [state.phase, state.isPaused]); // Only phase and pause state
+
+    // Handle timeLeft reaching 0
+    useEffect(() => {
+        if (state.timeLeft === 0 && (state.phase === 'preparing' || state.phase === 'active')) {
+            console.log('🏃 [RUNNING_TIMER] Time reached zero');
+
+            (async () => {
+                if (state.phase === 'preparing') {
+                    const firstInterval = intervals[0];
+                    console.log('🏃 [RUNNING_TIMER] Preparation complete, starting first interval:', firstInterval);
+
+                    setState(prev => ({
+                        ...prev,
+                        phase: 'active',
+                        currentIntervalIndex: 0,
+                        timeLeft: firstInterval.duration * 60,
+                    }));
+                    audio.playBell();
+                    audio.speak('¡Comienza!');
+                    await backgroundTimer.startBackgroundTimer(0);
+                    console.log('🏃 [RUNNING_TIMER] Background timer started');
+                } else if (state.phase === 'active') {
+                    console.log('🏃 [RUNNING_TIMER] Interval complete');
+                    handleIntervalComplete();
+                }
+            })();
+        }
+    }, [state.timeLeft, state.phase]);
 
     // Auto-save progress periodically
     useEffect(() => {
@@ -138,18 +171,31 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
                 if (state.phase === 'active' && !state.isPaused) {
                     // Get elapsed time including background time
                     const totalElapsed = await backgroundTimer.getElapsedTime();
+                    const timeDifference = totalElapsed - state.totalElapsedTime;
 
                     console.log('🏃 [RUNNING_TIMER] Syncing time from background:', {
                         previousElapsed: state.totalElapsedTime,
                         newElapsed: totalElapsed,
-                        difference: totalElapsed - state.totalElapsedTime,
+                        difference: timeDifference,
+                        currentTimeLeft: state.timeLeft,
                     });
 
-                    // Update state with background time
-                    setState(prev => ({
-                        ...prev,
-                        totalElapsedTime: totalElapsed,
-                    }));
+                    // Update state with background time AND recalculate timeLeft
+                    setState(prev => {
+                        const newTimeLeft = Math.max(0, prev.timeLeft - timeDifference);
+
+                        console.log('🏃 [RUNNING_TIMER] Updated state:', {
+                            oldTimeLeft: prev.timeLeft,
+                            newTimeLeft,
+                            totalElapsed,
+                        });
+
+                        return {
+                            ...prev,
+                            totalElapsedTime: totalElapsed,
+                            timeLeft: newTimeLeft,
+                        };
+                    });
 
                     // Restart background timer tracking with new time
                     await backgroundTimer.startBackgroundTimer(totalElapsed);
@@ -403,5 +449,8 @@ export const useRunningTimer = (config: UseRunningTimerConfig) => {
         markAsFailed,
         addNote,
         saveProgress,
+
+        // Audio
+        audio,
     };
 };

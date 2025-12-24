@@ -9,6 +9,7 @@ export interface TimerNotificationData {
     round?: number;
     totalRounds?: number;
     phase?: 'warmup' | 'workout' | 'cooldown' | 'rest';
+    isPreparing?: boolean; // True for "Prepárate" phase
     // Running specific
     distance?: number;
     pace?: string;
@@ -30,7 +31,7 @@ export class TimerNotificationService {
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('timer-active', {
                 name: 'Timer Activo',
-                importance: Notifications.AndroidImportance.HIGH,
+                importance: Notifications.AndroidImportance.MIN, // MIN = no sound, no vibration, no popup
                 vibrationPattern: [0],
                 enableVibrate: false,
                 lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
@@ -102,11 +103,11 @@ export class TimerNotificationService {
 
         const { title, body } = this.formatNotificationContent(this.currentData);
 
-        try {
-            // Dismiss previous notification
-            await Notifications.dismissNotificationAsync(TIMER_NOTIFICATION_ID);
+        console.log('🔔 [TIMER_NOTIFICATION] Updating:', { title, body, data: this.currentData });
 
-            // Schedule new notification
+        try {
+            // Don't dismiss - just update with same ID to avoid flickering
+            // Android will update the existing notification
             await Notifications.scheduleNotificationAsync({
                 content: {
                     title,
@@ -144,12 +145,16 @@ export class TimerNotificationService {
      * Format boxing timer notification
      */
     private static formatBoxingNotification(data: TimerNotificationData): { title: string; body: string } {
-        const { round, totalRounds, phase, timeRemaining } = data;
+        const { round, totalRounds, phase, timeRemaining, isPreparing } = data;
 
         let title = '🥊 Timer de Boxeo';
         let body = '';
 
-        if (phase === 'warmup') {
+        if (isPreparing) {
+            // "Prepárate" phase (10 seconds)
+            title = '⏱️ Prepárate';
+            body = timeRemaining ? this.formatTime(timeRemaining) : 'En progreso...';
+        } else if (phase === 'warmup') {
             title = '🔥 Calentamiento';
             body = timeRemaining ? this.formatTime(timeRemaining) : 'En progreso...';
         } else if (phase === 'cooldown') {

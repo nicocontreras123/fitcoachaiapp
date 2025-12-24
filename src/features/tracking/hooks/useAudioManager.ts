@@ -105,7 +105,7 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
      * Activates ducking to lower Spotify volume
      */
     const speak = useCallback(
-        (text: string, options?: any) => {
+        async (text: string, options?: any) => {
             console.log('🎤 [AUDIO] Speak called', {
                 text,
                 voiceEnabled,
@@ -120,29 +120,64 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
             }
 
             try {
+                // Check if TTS is available
+                const isSpeechAvailable = await Speech.isSpeakingAsync();
+                console.log('🎤 [AUDIO] TTS Status:', {
+                    isSpeaking: isSpeechAvailable,
+                    hasText: !!text,
+                });
+
+                // Stop any ongoing speech first
+                if (isSpeechAvailable) {
+                    console.log('🎤 [AUDIO] Stopping previous speech');
+                    await Speech.stop();
+                }
+
                 // Activar ducking cuando empieza a hablar
                 enableDucking();
                 isSpeaking = true;
 
+                console.log('🎤 [AUDIO] Calling Speech.speak with:', {
+                    text,
+                    language,
+                    pitch: 0.65,
+                    rate: 0.9,
+                });
+
+                // Set a timeout to detect if TTS is stuck
+                const timeoutId = setTimeout(() => {
+                    console.warn('⚠️ [AUDIO] Speech timeout - TTS may not be working properly');
+                    console.warn('⚠️ [AUDIO] Check: 1) Volume is up, 2) TTS engine installed, 3) Spanish language available');
+                }, 10000); // 10 second timeout
 
                 Speech.speak(text, {
                     language,
-                    pitch: 0.65,       // Voz mucho más grave (default: 1.0)
-                    rate: 0.9,         // Ligeramente más lento para claridad
-                    volume: 1.0,       // Volumen máximo para que se escuche sobre Spotify
+                    pitch: 1.0,        // Try default pitch first
+                    rate: 1.0,         // Try default rate first  
+                    volume: 1.0,       // Volumen máximo
                     ...options,
                     onDone: () => {
+                        clearTimeout(timeoutId);
+                        console.log('✅ [AUDIO] Speech completed');
                         isSpeaking = false;
-                        // OPTIMIZACIÓN: No desactivar ducking para evitar pausas en Spotify
-                        // El ducking se mantiene activo durante todo el entrenamiento
                         options?.onDone?.();
                     },
                     onError: (error: any) => {
+                        clearTimeout(timeoutId);
                         console.error('❌ [AUDIO] Speech error:', error);
+                        console.error('❌ [AUDIO] Error type:', typeof error);
+                        console.error('❌ [AUDIO] Error keys:', error ? Object.keys(error) : 'null');
                         isSpeaking = false;
                         options?.onError?.(error);
                     },
+                    onStopped: () => {
+                        clearTimeout(timeoutId);
+                        console.log('⏹️ [AUDIO] Speech stopped');
+                        isSpeaking = false;
+                    },
                 });
+
+                console.log('🎤 [AUDIO] Speech.speak called successfully');
             } catch (error) {
                 console.error('❌ [AUDIO] Error speaking:', error);
                 isSpeaking = false;
@@ -195,7 +230,14 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
             singletonTickPlayer.play();
             isTickPlaying = true;
             console.log('✅ [TICK_SOUND] Tick sound started successfully, singleton state:', isTickPlaying);
-        } catch (error) {
+        } catch (error: any) {
+            // Handle released player error gracefully
+            if (error?.message?.includes('already released') ||
+                error?.message?.includes('received class java.lang.Integer')) {
+                console.log('⚠️ [TICK_SOUND] Player was released, skipping tick sound');
+                isTickPlaying = false;
+                return;
+            }
             console.error('❌ [TICK_SOUND] Error starting tick sound:', error);
         }
     }, [timerSoundEnabled, enableDucking]);
@@ -246,8 +288,14 @@ export const useAudioManager = (config: AudioManagerConfig = {}) => {
         try {
             singletonBellPlayer.seekTo(0);
             singletonBellPlayer.play();
-        } catch (error) {
-            console.error('Error playing bell sound:', error);
+        } catch (error: any) {
+            // Handle released player error gracefully
+            if (error?.message?.includes('already released') ||
+                error?.message?.includes('received class java.lang.Integer')) {
+                console.log('⚠️ [BELL_SOUND] Player was released, skipping bell sound');
+                return;
+            }
+            console.error('❌ [BELL_SOUND] Error playing bell sound:', error);
         }
     }, [timerSoundEnabled]);
 

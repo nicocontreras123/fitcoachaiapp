@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { detectInstalledMusicApps, getMusicAppConfig, MusicApp } from '@/services/musicAppService';
 import Constants from 'expo-constants';
 import { PrepTimeModal } from '@/features/profile/components/PrepTimeModal';
 
@@ -15,6 +16,16 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   const [showPrepModal, setShowPrepModal] = useState(false);
+  const [installedMusicApps, setInstalledMusicApps] = useState<MusicApp[]>([]);
+
+  // Detect installed music apps on mount
+  useEffect(() => {
+    const detectApps = async () => {
+      const apps = await detectInstalledMusicApps();
+      setInstalledMusicApps(apps);
+    };
+    detectApps();
+  }, []);
 
   // Legacy state removed, handled now by Modal
 
@@ -169,6 +180,70 @@ export default function ProfileScreen() {
                 thumbColor={'#fff'}
               />
             </View>
+
+            {/* Music App Preference */}
+            {installedMusicApps.length > 0 && (
+              <View style={[styles.settingRow, { borderBottomColor: 'rgba(255,255,255,0.05)' }]}>
+                <View style={styles.settingLeft}>
+                  <View style={[styles.iconBox, { backgroundColor: 'rgba(19, 236, 91, 0.2)' }]}>
+                    <MaterialCommunityIcons name="music" size={20} color="#13ec5b" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.settingText, { color: '#fff' }]}>App de Música</Text>
+                    <Text style={{ color: '#9ca3af', fontSize: 12, marginTop: 2 }}>
+                      {userData?.preferredMusicApp
+                        ? getMusicAppConfig(userData.preferredMusicApp)?.name || 'Seleccionar'
+                        : 'Seleccionar app'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {installedMusicApps.map((app) => {
+                    const config = getMusicAppConfig(app);
+                    const isSelected = userData?.preferredMusicApp === app;
+                    return (
+                      <Pressable
+                        key={app}
+                        onPress={() => updateUserData({ preferredMusicApp: app })}
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
+                          backgroundColor: isSelected ? config?.color : '#1a1a1a',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          borderWidth: 2,
+                          borderColor: isSelected ? config?.color : 'transparent',
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name={config?.icon as any}
+                          size={20}
+                          color={isSelected ? '#fff' : config?.color}
+                        />
+                      </Pressable>
+                    );
+                  })}
+                  {userData?.preferredMusicApp && (
+                    <Pressable
+                      onPress={() => updateUserData({ preferredMusicApp: null })}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: '#1a1a1a',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderWidth: 2,
+                        borderColor: '#4b5563',
+                      }}
+                    >
+                      <MaterialCommunityIcons name="close" size={20} color="#9ca3af" />
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            )}
 
             {/* Prep Time (Modal Trigger) */}
             <Pressable

@@ -1,7 +1,6 @@
 import { useReducer, useCallback, useMemo, useEffect, useRef } from 'react';
 import { RoundStructure } from '../types/timer.types';
 import { useAudioManager } from './useAudioManager';
-import { TimerNotificationService } from '@/services/timerNotificationService';
 
 /**
  * Refactored Boxing Timer Hook
@@ -196,23 +195,7 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
         };
     }, [state.isActive, state.timeLeft]);
 
-    // Update timer notification
-    useEffect(() => {
-        if (state.isActive) {
-            // Determine phase
-            let phase: 'warmup' | 'workout' | 'cooldown' | 'rest' = 'workout';
-            if (state.isPreparing) phase = 'warmup';
-            else if (state.isRest) phase = 'rest';
-            // Note: cooldown detection would need additional state
 
-            TimerNotificationService.updateTimerNotification({
-                round: state.round,
-                totalRounds: state.totalRounds,
-                phase,
-                timeRemaining: state.timeLeft,
-            });
-        }
-    }, [state.isActive, state.round, state.totalRounds, state.timeLeft, state.isPreparing, state.isRest]);
 
     // Countdown announcements (3, 2, 1)
     useEffect(() => {
@@ -273,8 +256,6 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
                 // Finished all rounds
                 dispatch({ type: 'PAUSE' });
                 audio.speak('Entrenamiento completo!');
-                // Stop notification
-                TimerNotificationService.stopTimerNotification();
                 // Notify component that workout is complete
                 if (onWorkoutComplete) {
                     onWorkoutComplete();
@@ -303,25 +284,10 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
             willDispatch: state.isActive ? 'PAUSE' : 'START',
         });
 
-        if (!state.isActive) {
-            // Starting timer - start notification
-            await TimerNotificationService.startTimerNotification('boxing', {
-                type: 'boxing',
-                round: state.round,
-                totalRounds: state.totalRounds,
-                phase: state.isPreparing ? 'warmup' : state.isRest ? 'rest' : 'workout',
-                timeRemaining: state.timeLeft,
-            });
-        } else {
-            // Pausing timer - stop notification
-            await TimerNotificationService.stopTimerNotification();
-        }
-
         dispatch({ type: state.isActive ? 'PAUSE' : 'START' });
-    }, [state.isActive, state.round, state.totalRounds, state.isPreparing, state.isRest, state.timeLeft]);
+    }, [state.isActive]);
 
-    const resetTimer = useCallback(async () => {
-        await TimerNotificationService.stopTimerNotification();
+    const resetTimer = useCallback(() => {
         dispatch({ type: 'RESET', payload: { prepTime, totalRounds } });
         hasSpokenCountdownRef.current.clear();
         hasSpokenPrepareRef.current = false;
