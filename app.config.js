@@ -47,26 +47,13 @@ module.exports = ({ config }) => ({
             "RECORD_AUDIO",
             "POST_NOTIFICATIONS"
         ],
-        intentFilters: [
-            {
-                action: "VIEW",
-                data: [
-                    {
-                        scheme: "spotify"
-                    },
-                    {
-                        scheme: "youtubemusic"
-                    },
-                    {
-                        scheme: "youtube"
-                    },
-                    {
-                        scheme: "music"
-                    }
-                ],
-                category: ["BROWSABLE", "DEFAULT"]
-            }
-        ]
+        // Required for Android 11+ to detect installed apps
+        queries: {
+            package: [
+                "com.spotify.music",
+                "com.google.android.apps.youtube.music"
+            ]
+        }
     },
     web: {
         favicon: "./assets/favicon.png"

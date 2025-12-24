@@ -31,6 +31,9 @@ export function MusicAppButton({ position = 'top-right', style }: MusicAppButton
     const [shouldShow, setShouldShow] = useState(false);
     const [appConfig, setAppConfig] = useState<ReturnType<typeof getMusicAppConfig>>(null);
 
+    // Use ref to avoid stale closure in panResponder
+    const currentAppRef = React.useRef<MusicApp | null>(null);
+
     const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
     // Get initial position based on prop
@@ -41,6 +44,9 @@ export function MusicAppButton({ position = 'top-right', style }: MusicAppButton
     useEffect(() => {
         const checkMusicApp = async () => {
             const preferredApp = userData?.preferredMusicApp;
+
+            // Update ref with current value
+            currentAppRef.current = preferredApp || null;
 
             if (!preferredApp) {
                 console.log('🎵 [MUSIC_BUTTON] No preferred music app configured');
@@ -92,8 +98,8 @@ export function MusicAppButton({ position = 'top-right', style }: MusicAppButton
                 // Check if it was a tap (minimal movement)
                 const isTap = Math.abs(gesture.dx) < 10 && Math.abs(gesture.dy) < 10;
 
-                if (isTap && userData?.preferredMusicApp) {
-                    openMusicApp(userData.preferredMusicApp);
+                if (isTap && currentAppRef.current) {
+                    openMusicApp(currentAppRef.current);
                 }
 
                 Animated.spring(scaleAnim, {

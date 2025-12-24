@@ -177,10 +177,21 @@ export default function DashboardScreen() {
           </View>
         </View>
         <View style={styles.streakBadge}>
-          <MaterialCommunityIcons name="fire" size={20} color="#ff6b35" />
-          <Text style={styles.streakText}>
-            {statsLoading ? '...' : `${currentStreak} Días`}
-          </Text>
+          {currentStreak > 0 ? (
+            <>
+              <MaterialCommunityIcons name="fire" size={20} color="#ff6b35" />
+              <Text style={styles.streakText}>
+                {statsLoading ? '...' : `${currentStreak} ${currentStreak === 1 ? 'Día' : 'Días'}`}
+              </Text>
+            </>
+          ) : (
+            <>
+              <MaterialCommunityIcons name="calendar-check" size={20} color="#92c9a4" />
+              <Text style={[styles.streakText, { color: '#92c9a4' }]}>
+                {statsLoading ? '...' : 'Sin racha'}
+              </Text>
+            </>
+          )}
         </View>
       </View>
 
