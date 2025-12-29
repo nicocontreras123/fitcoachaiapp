@@ -6,35 +6,8 @@ type DayKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado'
 
 // Configure notification handler
 Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    // Filter notifications by day of week
-    const data = notification.request.content.data;
-    const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
-
-    // Check if this notification should show today
-    if (data?.targetDay !== undefined && data.targetDay !== today) {
-      // Don't show - wrong day
-      return {
-        shouldShowAlert: false,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-        shouldShowBanner: false,
-        shouldShowList: false,
-      };
-    }
-
-    if (data?.targetWeekday !== undefined && data.targetWeekday !== (today === 0 ? 1 : today + 1)) {
-      // Don't show - wrong day (adjust for weekday mapping)
-      return {
-        shouldShowAlert: false,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-        shouldShowBanner: false,
-        shouldShowList: false,
-      };
-    }
-
-    // Show notification
+  handleNotification: async () => {
+    // Show all notifications (WEEKLY triggers handle day filtering)
     return {
       shouldShowAlert: true,
       shouldPlaySound: true,
@@ -87,6 +60,35 @@ export class NotificationService {
     } catch (error) {
       console.error('Error requesting notification permissions:', error);
       return false;
+    }
+  }
+
+  /**
+   * Cancel ALL scheduled notifications (useful for debugging)
+   */
+  static async cancelAllNotifications(): Promise<void> {
+    try {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      console.log('✅ All scheduled notifications cancelled');
+    } catch (error) {
+      console.error('Error cancelling all notifications:', error);
+    }
+  }
+
+  /**
+   * List all scheduled notifications (for debugging)
+   */
+  static async listScheduledNotifications(): Promise<void> {
+    try {
+      const notifications = await Notifications.getAllScheduledNotificationsAsync();
+      console.log(`📋 Total scheduled notifications: ${notifications.length}`);
+      notifications.forEach((notif, index) => {
+        console.log(`  ${index + 1}. ${notif.content.title} - ${notif.content.body}`);
+        console.log(`     Trigger:`, notif.trigger);
+        console.log(`     Data:`, notif.content.data);
+      });
+    } catch (error) {
+      console.error('Error listing notifications:', error);
     }
   }
 
@@ -151,15 +153,17 @@ export class NotificationService {
       // Cancel all existing daily workout reminders
       await this.cancelDailyWorkoutReminders();
 
-      const daysOfWeek: DayKey[] = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+      const daysOfWeek: DayKey[] = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+
+      // Map day names to weekday numbers (1 = Sunday, 2 = Monday, etc.)
       const weekdayMap: { [key in DayKey]: number } = {
-        lunes: 2,    // Monday
-        martes: 3,   // Tuesday
+        domingo: 1,   // Sunday
+        lunes: 2,     // Monday
+        martes: 3,    // Tuesday
         miercoles: 4, // Wednesday
-        jueves: 5,   // Thursday
-        viernes: 6,  // Friday
-        sabado: 7,   // Saturday
-        domingo: 1,  // Sunday
+        jueves: 5,    // Thursday
+        viernes: 6,   // Friday
+        sabado: 7,    // Saturday
       };
 
       for (const dayKey of daysOfWeek) {
@@ -169,27 +173,31 @@ export class NotificationService {
         if (dayData && !dayData.restDay && dayData.workout) {
           const weekday = weekdayMap[dayKey];
 
-          // Use DAILY trigger - more reliable cross-platform
-          // Store target weekday in data to filter in notification handler
+          // Use WEEKLY trigger to only fire on specific day of week
           await Notifications.scheduleNotificationAsync({
             content: {
               title: '💪 Hora de entrenar!',
-              body: `Hoy es ${dayData.day}. Tienes un entrenamiento programado. ¡Vamos!`,
+              body: `Hoy es ${dayKey}. Tienes un entrenamiento programado. ¡Vamos!`,
               data: {
                 type: 'daily-workout-reminder',
                 day: dayKey,
-                targetWeekday: weekday, // Store to filter on delivery
               },
               sound: 'default',
+              ...(Platform.OS === 'android' && {
+                channelId: 'workout-reminders',
+              }),
             },
             trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+              weekday: weekday,
               hour: 7,
               minute: 0,
             },
           });
 
-          console.log(`Daily workout reminder scheduled for ${dayKey}`);
+          console.log(`✅ Daily workout reminder scheduled for ${dayKey} (weekday ${weekday})`);
+        } else {
+          console.log(`⏭️ Skipping ${dayKey} - ${!dayData ? 'no data' : dayData.restDay ? 'rest day' : 'no workout'}`);
         }
       }
     } catch (error) {
@@ -214,18 +222,6 @@ export class NotificationService {
       console.log(`Cancelled ${dailyNotifications.length} daily workout reminders`);
     } catch (error) {
       console.error('Error cancelling daily workout reminders:', error);
-    }
-  }
-
-  /**
-   * Cancel all notifications
-   */
-  static async cancelAllNotifications(): Promise<void> {
-    try {
-      await Notifications.cancelAllScheduledNotificationsAsync();
-      console.log('All notifications cancelled');
-    } catch (error) {
-      console.error('Error cancelling all notifications:', error);
     }
   }
 

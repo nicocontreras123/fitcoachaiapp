@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { useOnboardingStore } from '@/features/onboarding/store/onboardingStore';
 import { COLORS } from '@/constants/theme';
 import { PrimaryButton, ProgressIndicator, GoalCard } from '@/components/common';
+import { RunningGoalModal } from '@/features/profile/components/RunningGoalModal';
+import { RunningGoalData } from '@/features/profile/types';
 
 const GOALS = [
   {
@@ -18,7 +20,7 @@ const GOALS = [
     title: 'Desarrollar Músculo',
     description: 'Ganar masa y fuerza',
     icon: 'dumbbell' as const,
-    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAwOH1iFjZuzbZLX5MopcgwSA-ZmJdZ2IS8CnnkT-bEsX2w787uFapzS3wo4hWjQ166M3nc4_TLHuaNAtP1w4J9_RtG_R9ZCgGob-KOuK4Url7arOfYR0vSXQJyYNYf0Gt4bq4qOcT7lAsyqG0D_Cqet6Bn6a1u3HLZhmtX_kKcVlt3mUFOEEoH2etE3NmcHE0FvuV1XFzZEmsCea7AkV6TT1x9MKCd7ZKu7oVkXhSp0heDmR6jGHFIu5-lInupzZW90zxUo7ifpf0',
+    imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAwOH1iFjZuzbZLX5MopcgwSA-ZmJdZ2IS8CnnkT-bEsX2w787uFapzS3wo4hWjQ166M3nc4_TLHuaNAtP1w4J9_RtG_R9ZCgGob-KOuK4Url7arOfYR0vSXQJyYNYf0Gt4bq4qOcT7lAsyqG0D_Cqet7Bn6a1u3HLZhmtX_kKcVlt3mUFOEEoH2etE3NmcHE0FvuV1XFzZEmsCea7AkV6TT1x9MKCd7ZKu7oVkXhSp0heDmR6jGHFIu5-lInupzZW90zxUo7ifpf0',
   },
   {
     id: 'improve-endurance',
@@ -43,9 +45,37 @@ export default function GoalsScreen() {
   const [selectedGoal, setSelectedGoal] = useState<string | null>(
     formData.goals?.[0] || null
   );
+  const [showRunningGoalModal, setShowRunningGoalModal] = useState(false);
+
+  // Check if user selected running as sport
+  const isRunningSport = formData.sports?.includes('running') || formData.deportes?.includes('running');
+
+  const handleGoalSelect = (goalId: string) => {
+    setSelectedGoal(goalId);
+
+    // If running sport + endurance goal, show running goal modal
+    if (isRunningSport && goalId === 'improve-endurance') {
+      setShowRunningGoalModal(true);
+    }
+  };
+
+  const handleRunningGoalSave = (runningGoalData: RunningGoalData) => {
+    setFormData({
+      goals: [selectedGoal!],
+      runningGoal: runningGoalData,
+    });
+    router.push('/onboarding/loading');
+  };
 
   const handleContinue = () => {
     if (!selectedGoal) return;
+
+    // If running + endurance and no running goal data yet, show modal
+    if (isRunningSport && selectedGoal === 'improve-endurance' && !formData.runningGoal) {
+      setShowRunningGoalModal(true);
+      return;
+    }
+
     setFormData({ goals: [selectedGoal] });
     router.push('/onboarding/loading');
   };
@@ -88,7 +118,7 @@ export default function GoalsScreen() {
                 icon={goal.icon}
                 imageUrl={goal.imageUrl}
                 isSelected={selectedGoal === goal.id}
-                onPress={() => setSelectedGoal(goal.id)}
+                onPress={() => handleGoalSelect(goal.id)}
               />
             </View>
           ))}
@@ -108,6 +138,14 @@ export default function GoalsScreen() {
           CONTINUAR
         </PrimaryButton>
       </View>
+
+      {/* Running Goal Modal */}
+      <RunningGoalModal
+        visible={showRunningGoalModal}
+        onClose={() => setShowRunningGoalModal(false)}
+        onSave={handleRunningGoalSave}
+        initialData={formData.runningGoal}
+      />
     </View>
   );
 }

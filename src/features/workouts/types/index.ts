@@ -75,6 +75,13 @@ export interface WeeklyRoutine {
   weekStarting: string; // ISO Date
   days: Record<string, DailyRoutine>; // lunes, martes...
   goal: string;
+  metadata?: {
+    isProgressivePlan?: boolean;
+    currentWeek?: number;
+    totalWeeks?: number;
+    targetDistance?: number;
+    fullPlan?: any[]; // Progressive plan weeks
+  };
 }
 
 export interface WorkoutHistory {

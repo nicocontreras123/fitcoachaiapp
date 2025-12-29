@@ -41,6 +41,17 @@ export interface UserData {
   // Music app preference
   preferredMusicApp?: 'spotify' | 'youtube-music' | 'apple-music' | null;
   photoUrl?: string;
+  // Running goal data (for distance-based training plans)
+  runningGoal?: RunningGoalData;
+}
+
+export interface RunningGoalData {
+  targetDistance: number; // Target distance in km (e.g., 5, 10, 21, 42)
+  currentMaxDistance: number; // Current maximum distance they can run in km
+  currentMaxTime: number; // Time for current max distance in minutes
+  currentWeeklyKm: number; // Current weekly running volume in km
+  targetDate?: string; // Optional target date to achieve the goal
+  planWeeks?: number; // Calculated plan duration in weeks
 }
 
 export interface OnboardingStepData {

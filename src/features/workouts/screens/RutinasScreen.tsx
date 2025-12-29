@@ -188,8 +188,12 @@ export default function RutinasScreen() {
                 {/* Headline Section */}
                 <View style={styles.headlineSection}>
                     <View style={styles.headlineContent}>
-                        <View>
-                            <Text style={styles.headlineSubtitle}>SEMANA 1 • DÍA 1</Text>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.headlineSubtitle}>
+                                {currentWeeklyRoutine?.metadata?.isProgressivePlan
+                                    ? `SEMANA ${currentWeeklyRoutine?.metadata?.currentWeek}/${currentWeeklyRoutine?.metadata?.totalWeeks}`
+                                    : 'SEMANA 1 • DÍA 1'}
+                            </Text>
                             <Text style={styles.headlineTitle}>
                                 Tu Objetivo:{'\n'}
                                 <Text style={styles.headlineGradient}>
@@ -211,6 +215,20 @@ export default function RutinasScreen() {
                                     })()}
                                 </Text>
                             </Text>
+
+                            {/* View Full Plan Button for Progressive Plans */}
+                            {currentWeeklyRoutine?.metadata?.isProgressivePlan && (
+                                <Pressable
+                                    style={styles.viewPlanButton}
+                                    onPress={() => router.push('/running-plan' as any)}
+                                >
+                                    <MaterialCommunityIcons name="calendar-month" size={18} color={COLORS.primary.DEFAULT} />
+                                    <Text style={styles.viewPlanButtonText}>
+                                        Ver Plan Completo ({currentWeeklyRoutine?.metadata?.totalWeeks} semanas)
+                                    </Text>
+                                    <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.primary.DEFAULT} />
+                                </Pressable>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -455,6 +473,24 @@ const styles = StyleSheet.create({
     },
     headlineGradient: {
         color: '#9ca3af',
+    },
+    viewPlanButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(19, 236, 91, 0.1)',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 8,
+        marginTop: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(19, 236, 91, 0.2)',
+    },
+    viewPlanButtonText: {
+        flex: 1,
+        fontSize: 14,
+        fontFamily: 'Lexend_600SemiBold',
+        color: COLORS.primary.DEFAULT,
     },
     aiIcon: {
         backgroundColor: '#182e21',

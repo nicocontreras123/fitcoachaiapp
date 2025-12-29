@@ -1,10 +1,8 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet, Animated } from 'react-native';
+import { Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '@/hooks/useTheme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
-import { BlurView } from 'expo-blur';
 
 interface TabBarIconProps {
   name: string;
@@ -45,7 +43,6 @@ function TabBarIcon({ name, color, focused }: TabBarIconProps) {
 }
 
 export default function TabsLayout() {
-  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   return (
@@ -102,6 +99,13 @@ export default function TabsLayout() {
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color, focused }) => <TabBarIcon name="profile" color={color} focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="running-plan"
+        options={{
+          href: null, // Hide from tab bar - this is a detail view
+          title: 'Plan de Carrera',
         }}
       />
     </Tabs>

@@ -614,6 +614,15 @@ export class OpenAIService {
   static async generateWeeklyRoutine(params: GenerateWorkoutParams): Promise<WeeklyRoutine> {
     const { userProfile, goals, availableDays, sport } = params;
 
+    // Check if user has a running goal with distance target
+    const runningGoal = (userProfile as any)?.runningGoal;
+    const isRunningWithGoal = (sport === 'running' || userProfile?.deportes?.includes('running')) && runningGoal;
+
+    // If running with distance goal, use progressive plan generator
+    if (isRunningWithGoal) {
+      return this.generateRunningProgressivePlan(params, runningGoal);
+    }
+
     // Usar nivel del userProfile con fallback a params.level
     const level = userProfile?.level || params.level || 'intermediate';
 
@@ -722,5 +731,97 @@ DÍAS Y EQUIPAMIENTO:
         domingo: { day: "Domingo", restDay: true, notes: "" },
       }
     };
+  }
+
+  /**
+   * Generate a progressive running plan based on distance goal
+   */
+  static async generateRunningProgressivePlan(
+    params: GenerateWorkoutParams,
+    runningGoal: any
+  ): Promise<WeeklyRoutine> {
+    const { RunningPlanGenerator } = await import('./runningPlanGenerator');
+    const { userProfile, availableDays } = params;
+
+    // Get training days per week
+    const trainingDaysPerWeek = availableDays?.length || userProfile?.trainingDaysPerWeek || 4;
+
+    // Generate the full progressive plan
+    const progressivePlan = RunningPlanGenerator.generateProgressivePlan(
+      runningGoal,
+      trainingDaysPerWeek
+    );
+
+    console.log(`📊 Generated ${progressivePlan.length}-week running plan`);
+    console.log(`   Target: ${runningGoal.targetDistance}km`);
+    console.log(`   Current: ${runningGoal.currentMaxDistance}km`);
+    console.log(`   ${RunningPlanGenerator.getPlanSummary(progressivePlan)}`);
+
+    // For now, return the FIRST week of the plan
+    // TODO: Implement multi-week tracking system
+    const firstWeek = progressivePlan[0];
+
+    // Convert running workouts to WeeklyRoutine format
+    const days: any = {
+      lunes: { day: 'Lunes', restDay: true, notes: '' },
+      martes: { day: 'Martes', restDay: true, notes: '' },
+      miércoles: { day: 'Miércoles', restDay: true, notes: '' },
+      jueves: { day: 'Jueves', restDay: true, notes: '' },
+      viernes: { day: 'Viernes', restDay: true, notes: '' },
+      sábado: { day: 'Sábado', restDay: true, notes: '' },
+      domingo: { day: 'Domingo', restDay: true, notes: '' },
+    };
+
+    // Map running workouts to days
+    firstWeek.workouts.forEach((workout) => {
+      const dayKey = workout.day as keyof typeof days;
+
+      days[dayKey] = {
+        day: workout.day.charAt(0).toUpperCase() + workout.day.slice(1),
+        restDay: workout.type === 'rest',
+        workout: workout.type !== 'rest' ? {
+          title: this.getRunningWorkoutTitle(workout.type),
+          difficulty: workout.intensity === 'high' ? 'advanced' : workout.intensity === 'medium' ? 'intermediate' : 'beginner',
+          totalDuration: workout.duration || 30,
+          description: workout.description,
+          type: 'running',
+          distance: workout.distance,
+          targetPace: workout.duration ? Math.floor(workout.duration / workout.distance) : undefined,
+          workoutType: workout.type,
+        } : undefined,
+        notes: `Semana 1 de ${progressivePlan.length} - ${firstWeek.totalDistance}km total`,
+      };
+    });
+
+    const routine: WeeklyRoutine = {
+      weekStarting: new Date().toISOString(),
+      goal: `Plan progresivo ${runningGoal.targetDistance}km - Semana 1/${progressivePlan.length}`,
+      days,
+      // Store the full plan for future weeks
+      metadata: {
+        isProgressivePlan: true,
+        currentWeek: 1,
+        totalWeeks: progressivePlan.length,
+        targetDistance: runningGoal.targetDistance,
+        fullPlan: progressivePlan,
+      },
+    };
+
+    return routine;
+  }
+
+  /**
+   * Get user-friendly title for running workout type
+   */
+  private static getRunningWorkoutTitle(type: string): string {
+    const titles: Record<string, string> = {
+      'easy-run': 'Carrera Suave',
+      'tempo-run': 'Carrera de Tempo',
+      'intervals': 'Entrenamiento de Intervalos',
+      'long-run': 'Carrera Larga',
+      'recovery-run': 'Carrera de Recuperación',
+      'rest': 'Descanso',
+    };
+    return titles[type] || 'Carrera';
   }
 }
