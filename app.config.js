@@ -24,7 +24,7 @@ module.exports = ({ config }) => ({
             NSLocationAlwaysAndWhenInUseUsageDescription: "FitCoach AI needs your location in the background to continue tracking your running workouts when the screen is locked.",
             NSMicrophoneUsageDescription: "FitCoach AI needs microphone access to provide voice feedback during your workouts.",
             NSUserNotificationsUsageDescription: "FitCoach AI needs permission to send you reminders about your daily workouts and weekly routine updates.",
-            LSApplicationQueriesSchemes: ["spotify"],
+            LSApplicationQueriesSchemes: ["spotify", "youtubemusic", "youtube", "music", "applemusic"],
             UIBackgroundModes: [
                 "audio",
                 "location"
@@ -46,7 +46,14 @@ module.exports = ({ config }) => ({
             "FOREGROUND_SERVICE_LOCATION",
             "RECORD_AUDIO",
             "POST_NOTIFICATIONS"
-        ]
+        ],
+        // Required for Android 11+ to detect installed apps
+        queries: {
+            package: [
+                "com.spotify.music",
+                "com.google.android.apps.youtube.music"
+            ]
+        }
     },
     web: {
         favicon: "./assets/favicon.png"

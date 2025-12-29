@@ -195,6 +195,8 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
         };
     }, [state.isActive, state.timeLeft]);
 
+
+
     // Countdown announcements (3, 2, 1)
     useEffect(() => {
         if (state.isActive && state.timeLeft <= 3 && state.timeLeft > 0) {
@@ -276,11 +278,12 @@ export const useBoxeoTimer = (_sessionId: string, config?: TimerConfig) => {
     ]);
 
     // Actions
-    const toggleTimer = useCallback(() => {
+    const toggleTimer = useCallback(async () => {
         console.log('🎮 [TOGGLE_TIMER] Called', {
             currentIsActive: state.isActive,
             willDispatch: state.isActive ? 'PAUSE' : 'START',
         });
+
         dispatch({ type: state.isActive ? 'PAUSE' : 'START' });
     }, [state.isActive]);
 

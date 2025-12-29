@@ -150,8 +150,13 @@ export const useBackgroundTimer = () => {
 
         return () => {
             subscription.remove();
+            // Clear saved state when component unmounts (app force-closed)
+            clearTimerState().catch(err =>
+                console.error('❌ [BACKGROUND_TIMER] Failed to clear state on unmount:', err)
+            );
+            console.log('⏱️ [BACKGROUND_TIMER] Component unmounted, clearing state');
         };
-    }, []);
+    }, [clearTimerState]);
 
     return {
         startBackgroundTimer,

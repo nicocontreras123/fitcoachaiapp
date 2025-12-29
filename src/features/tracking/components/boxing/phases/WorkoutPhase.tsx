@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, StatusBar, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, StatusBar, Animated, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { formatTime } from '@/utils/timeUtils';
 import { ExerciseCard, BlurHeader, IntensityBar } from '@/components/timer';
 import { TimerControls } from '../../shared';
@@ -157,6 +158,15 @@ export const WorkoutPhase: React.FC<WorkoutPhaseProps> = ({
                                     <View key={index} style={styles.exerciseItem}>
                                         <View style={[styles.exerciseDot, { backgroundColor: phaseColors.primary }]} />
                                         <Text style={styles.exerciseItemText}>{exercise.name}</Text>
+                                        <Pressable
+                                            style={styles.searchButton}
+                                            onPress={() => {
+                                                const searchQuery = encodeURIComponent(`${exercise.name}`);
+                                                Linking.openURL(`https://www.google.com/search?q=${searchQuery}`);
+                                            }}
+                                        >
+                                            <MaterialCommunityIcons name="magnify" size={20} color={phaseColors.primary} />
+                                        </Pressable>
                                     </View>
                                 ))}
                             </View>
@@ -389,5 +399,12 @@ const styles = StyleSheet.create({
         fontFamily: 'Lexend_500Medium',
         color: '#ffffff',
         flex: 1,
+    },
+    searchButton: {
+        padding: 8,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

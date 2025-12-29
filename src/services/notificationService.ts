@@ -1,14 +1,48 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { WeeklyRoutine, DayKey } from '../features/workouts/types';
+import { WeeklyRoutine } from '../features/workouts/types';
+
+type DayKey = 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    // Filter notifications by day of week
+    const data = notification.request.content.data;
+    const today = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+    // Check if this notification should show today
+    if (data?.targetDay !== undefined && data.targetDay !== today) {
+      // Don't show - wrong day
+      return {
+        shouldShowAlert: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: false,
+        shouldShowList: false,
+      };
+    }
+
+    if (data?.targetWeekday !== undefined && data.targetWeekday !== (today === 0 ? 1 : today + 1)) {
+      // Don't show - wrong day (adjust for weekday mapping)
+      return {
+        shouldShowAlert: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: false,
+        shouldShowList: false,
+      };
+    }
+
+    // Show notification
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
 });
 
 export type NotificationIdentifiers = {
@@ -17,8 +51,7 @@ export type NotificationIdentifiers = {
 };
 
 export class NotificationService {
-  private static WEEKLY_ROUTINE_NOTIFICATION_ID = 'weekly-routine-reminder';
-  private static DAILY_WORKOUT_NOTIFICATION_ID = 'daily-workout-reminder';
+
 
   /**
    * Request notification permissions from the user
@@ -66,19 +99,19 @@ export class NotificationService {
       // Cancel existing week-end reminder first
       await this.cancelWeekEndReminder();
 
-      // Schedule for every Sunday at 8:00 PM
+      // Use DAILY trigger at 8 PM - will fire every day but we can filter in the app
+      // This is more reliable than CALENDAR which isn't supported on Android
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
           title: '🏁 Semana completada!',
           body: 'Tu semana de entrenamiento ha terminado. Genera tu nueva rutina para la próxima semana.',
-          data: { type: 'week-end-reminder' },
+          data: { type: 'week-end-reminder', targetDay: 0 }, // 0 = Sunday
           sound: 'default',
         },
         trigger: {
-          weekday: 1, // Sunday (1 = Sunday, 2 = Monday, etc.)
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
           hour: 20,
           minute: 0,
-          repeats: true,
         },
       });
 
@@ -132,10 +165,12 @@ export class NotificationService {
       for (const dayKey of daysOfWeek) {
         const dayData = routine.days[dayKey];
 
-        // Only schedule notification if it's not a rest day and has a workout
-        if (!dayData.restDay && dayData.workout) {
+        // Only schedule notification if day exists, it's not a rest day and has a workout
+        if (dayData && !dayData.restDay && dayData.workout) {
           const weekday = weekdayMap[dayKey];
 
+          // Use DAILY trigger - more reliable cross-platform
+          // Store target weekday in data to filter in notification handler
           await Notifications.scheduleNotificationAsync({
             content: {
               title: '💪 Hora de entrenar!',
@@ -143,14 +178,14 @@ export class NotificationService {
               data: {
                 type: 'daily-workout-reminder',
                 day: dayKey,
+                targetWeekday: weekday, // Store to filter on delivery
               },
               sound: 'default',
             },
             trigger: {
-              weekday,
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
               hour: 7,
               minute: 0,
-              repeats: true,
             },
           });
 

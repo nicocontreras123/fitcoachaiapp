@@ -24,11 +24,18 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
         autoSave: true,
     });
 
-    const { state, currentInterval, gps, currentPace, estimatedCalories, progress } = timer;
+    const { state, currentInterval, gps, currentPace, estimatedCalories, progress, audio } = timer;
 
     const [showNoteModal, setShowNoteModal] = useState(false);
     const [noteInput, setNoteInput] = useState('');
     const [showAutoPauseInfo, setShowAutoPauseInfo] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+
+    const handleMuteToggle = () => {
+        setIsMuted(!isMuted);
+        // Note: The actual muting would need to be implemented in useAudioManager
+        // For now this just toggles the icon
+    };
 
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -88,22 +95,6 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const getIntervalColor = (type: string) => {
-        switch (type) {
-            case 'warm-up':
-                return '#3b82f6';
-            case 'run':
-                return '#13ec5b';
-            case 'sprint':
-                return '#f59e0b';
-            case 'recovery':
-                return '#8b5cf6';
-            case 'cool-down':
-                return '#6b7280';
-            default:
-                return '#13ec5b';
-        }
-    };
 
     const getIntervalName = (type: string) => {
         switch (type) {
@@ -178,23 +169,23 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                 <Pressable style={styles.iconButton} onPress={onExit}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color="#ffffff" />
                 </Pressable>
+
+                {/* Centered content: Title, GPS */}
                 <View style={styles.topCenter}>
-                    <Text style={styles.topSubtitle}>{workout.title}</Text>
+                    <Text style={styles.topTitle}>{workout.title}</Text>
                     <View style={styles.gpsIndicator}>
                         <MaterialCommunityIcons name="satellite-variant" size={14} color={gpsQuality.color} />
                         <Text style={[styles.gpsText, { color: gpsQuality.color }]}>{gpsQuality.text}</Text>
                     </View>
                 </View>
 
-                {/* Time Badge instead of Note button */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View style={styles.topTimeBadge}>
-                        <Text style={styles.topTimeText}>Restante: {formatTime(Math.max(0, totalTimeRemaining))}</Text>
-                    </View>
-                    <Pressable style={styles.iconButton} onPress={() => setShowNoteModal(true)}>
-                        <MaterialCommunityIcons name="note-text" size={24} color="#ffffff" />
-                    </Pressable>
-                </View>
+                <Pressable style={styles.iconButton} onPress={handleMuteToggle}>
+                    <MaterialCommunityIcons
+                        name={isMuted ? "volume-off" : "volume-high"}
+                        size={24}
+                        color="#ffffff"
+                    />
+                </Pressable>
             </View>
 
             {/* Auto-pause indicator */}
@@ -225,7 +216,7 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                                 styles.chip,
                                 isCompleted && styles.chipCompleted,
                                 isFailed && styles.chipFailed,
-                                isCurrent && [styles.chipActive, { backgroundColor: getIntervalColor(interval.type) }],
+                                isCurrent && [styles.chipActive, { backgroundColor: '#13ec5b' }],
                                 isUpcoming && styles.chipUpcoming,
                             ]}
                         >
@@ -272,12 +263,20 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                 <View style={styles.backgroundPattern} />
 
                 {/* Circular progress */}
-                <Animated.View style={[styles.progressContainer, { transform: [{ scale: pulseAnim }] }]}>
+                <View style={styles.progressContainer}>
                     <CircularProgress
-                        progress={currentInterval ? 1 - state.timeLeft / (currentInterval.duration * 60) : 0}
+                        progress={
+                            state.phase === 'idle'
+                                ? 0  // Empty circle when not started
+                                : state.phase === 'preparing'
+                                    ? state.timeLeft / 10  // Starts at 1 (full), decreases to 0 (empty)
+                                    : currentInterval
+                                        ? state.timeLeft / (currentInterval.duration * 60)  // Starts full, empties
+                                        : 0
+                        }
                         size={260}
                         strokeWidth={12}
-                        color={currentInterval ? getIntervalColor(currentInterval.type) : '#13ec5b'}
+                        color="#13ec5b"
                         backgroundColor="#1f3a29"
                     >
                         <View style={styles.progressContent}>
@@ -295,15 +294,16 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                             )}
                             {(state.phase === 'active' || state.phase === 'paused') && currentInterval && (
                                 <>
+                                    <Text style={styles.intervalCount}>
+                                        {state.currentIntervalIndex + 1}/{workout.intervals.length}
+                                    </Text>
                                     <Text
                                         style={[
                                             styles.intervalLabel,
-                                            { color: getIntervalColor(currentInterval.type) },
+                                            { color: '#13ec5b' },
                                         ]}
                                     >
-
-                                        {getIntervalName(currentInterval.type)}{' '}
-                                        {state.currentIntervalIndex + 1}/{workout.intervals.length}
+                                        {getIntervalName(currentInterval.type)}
                                     </Text>
                                     <Text style={styles.timerLarge}>{formatTime(state.timeLeft)}</Text>
                                     <Text style={styles.timerSubtext}>
@@ -320,7 +320,7 @@ export function RunningTrackerNew({ workout, onComplete, onExit }: RunningTracke
                             )}
                         </View>
                     </CircularProgress>
-                </Animated.View>
+                </View>
 
                 {/* Stats grid */}
                 <View style={styles.statsGrid}>
@@ -519,13 +519,15 @@ const styles = StyleSheet.create({
     topCenter: {
         flex: 1,
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
     },
-    topSubtitle: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: 'rgba(255, 255, 255, 0.6)',
+    topTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#ffffff',
         textTransform: 'uppercase',
-        letterSpacing: 2,
+        letterSpacing: 1,
     },
     gpsIndicator: {
         flexDirection: 'row',
@@ -637,6 +639,12 @@ const styles = StyleSheet.create({
     },
     progressContent: {
         alignItems: 'center',
+    },
+    intervalCount: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: 'rgba(255, 255, 255, 0.7)',
+        marginBottom: 4,
     },
     intervalLabel: {
         fontSize: 14,

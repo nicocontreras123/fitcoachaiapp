@@ -364,23 +364,24 @@ export default function RutinasScreen() {
                     ))}
                 </View>
 
-                <View style={{ height: 120 }} />
-            </ScrollView>
-
-            {/* Floating Action Button */}
-            <View style={styles.fabContainer}>
+                {/* Regenerate Button */}
                 <Pressable
-                    style={styles.fab}
+                    style={[styles.regenerateButton, isGenerating && styles.regenerateButtonDisabled]}
                     onPress={handleGenerateRoutine}
                     disabled={isGenerating}
                 >
                     <MaterialCommunityIcons
                         name="autorenew"
                         size={24}
-                        color={COLORS.primary.DEFAULT}
+                        color={isGenerating ? '#6b7280' : COLORS.primary.DEFAULT}
                     />
+                    <Text style={[styles.regenerateButtonText, isGenerating && styles.regenerateButtonTextDisabled]}>
+                        {isGenerating ? 'Generando...' : 'Regenerar Rutina Semanal'}
+                    </Text>
                 </Pressable>
-            </View>
+
+                <View style={{ height: 120 }} />
+            </ScrollView>
 
             {/* Loading Modal */}
             <Modal
@@ -686,33 +687,32 @@ const styles = StyleSheet.create({
     dayArrowActive: {
         backgroundColor: 'rgba(19,236,91,0.1)',
     },
-    fabContainer: {
-        position: 'absolute',
-        bottom: 24,
-        left: 16,
-        right: 16,
-        alignItems: 'center',
-    },
-    fab: {
+    regenerateButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        backgroundColor: '#112217',
+        justifyContent: 'center',
+        gap: 12,
+        backgroundColor: '#182e21',
         borderWidth: 1,
-        borderColor: `${COLORS.primary.DEFAULT}4D`,
+        borderColor: COLORS.primary.DEFAULT,
         paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 24,
-        shadowColor: COLORS.primary.DEFAULT,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.15,
-        shadowRadius: 15,
-        elevation: 8,
+        paddingVertical: 16,
+        borderRadius: 12,
+        marginTop: 24,
+        marginHorizontal: 16,
     },
-    fabText: {
+    regenerateButtonDisabled: {
+        backgroundColor: '#1a1a1a',
+        borderColor: '#4b5563',
+        opacity: 0.6,
+    },
+    regenerateButtonText: {
         fontSize: 16,
         fontFamily: 'Lexend_700Bold',
         color: COLORS.primary.DEFAULT,
+    },
+    regenerateButtonTextDisabled: {
+        color: '#6b7280',
     },
     modalOverlay: {
         flex: 1,

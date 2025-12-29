@@ -5,9 +5,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { detectInstalledMusicApps, getMusicAppConfig, MusicApp } from '@/services/musicAppService';
 import Constants from 'expo-constants';
 import { PrepTimeModal } from '@/features/profile/components/PrepTimeModal';
+import { MusicAppSelectorModal } from '@/features/profile/components/MusicAppSelectorModal';
 
 export default function ProfileScreen() {
   const { userData, updateUserData } = useUserStore();
@@ -15,6 +17,17 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   const [showPrepModal, setShowPrepModal] = useState(false);
+  const [showMusicAppModal, setShowMusicAppModal] = useState(false);
+  const [installedMusicApps, setInstalledMusicApps] = useState<MusicApp[]>([]);
+
+  // Detect installed music apps on mount
+  useEffect(() => {
+    const detectApps = async () => {
+      const apps = await detectInstalledMusicApps();
+      setInstalledMusicApps(apps);
+    };
+    detectApps();
+  }, []);
 
   // Legacy state removed, handled now by Modal
 
@@ -170,6 +183,29 @@ export default function ProfileScreen() {
               />
             </View>
 
+            {/* Music App Preference */}
+            {installedMusicApps.length > 0 && (
+              <Pressable
+                style={[styles.settingRow, { borderBottomColor: 'rgba(255,255,255,0.05)' }]}
+                onPress={() => setShowMusicAppModal(true)}
+              >
+                <View style={styles.settingLeft}>
+                  <View style={[styles.iconBox, { backgroundColor: 'rgba(19, 236, 91, 0.2)' }]}>
+                    <MaterialCommunityIcons name="music" size={20} color="#13ec5b" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.settingText, { color: '#fff' }]}>App de Música</Text>
+                    <Text style={{ color: '#9ca3af', fontSize: 12, marginTop: 2 }}>
+                      {userData?.preferredMusicApp
+                        ? getMusicAppConfig(userData.preferredMusicApp)?.name || 'Seleccionar'
+                        : 'Ninguna seleccionada'}
+                    </Text>
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={24} color="#4b5563" />
+              </Pressable>
+            )}
+
             {/* Prep Time (Modal Trigger) */}
             <Pressable
               style={styles.settingRow}
@@ -216,6 +252,14 @@ export default function ProfileScreen() {
           onSave={handleSavePrepTime}
           initialMinutes={userData?.prepTimeMinutes || 0}
           initialSeconds={userData?.prepTimeSeconds || 10}
+        />
+
+        <MusicAppSelectorModal
+          visible={showMusicAppModal}
+          onClose={() => setShowMusicAppModal(false)}
+          onSelect={(app) => updateUserData({ preferredMusicApp: app })}
+          availableApps={installedMusicApps}
+          selectedApp={userData?.preferredMusicApp}
         />
 
         <View style={{ height: 100 }} />
