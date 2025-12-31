@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     alignItems: 'center',
-    gap: 24,
+    gap: 16,
   },
   headlineContainer: {
     alignItems: 'center',
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   spacer: {
-    height: 16,
+    height: 8,
   },
   buttonContainer: {
     width: '100%',
@@ -210,6 +210,6 @@ const styles = StyleSheet.create({
     textDecorationStyle: 'solid',
   },
   bottomSpacer: {
-    height: 8,
+    height: 80,
   },
 });

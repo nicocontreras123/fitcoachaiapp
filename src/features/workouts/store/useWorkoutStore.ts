@@ -48,13 +48,32 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
             await StorageService.setItem(STORAGE_KEYS.WEEKLY_ROUTINE, routine);
 
             try {
+                // Translate goal to Spanish for MongoDB
+                const goalTranslations: Record<string, string> = {
+                    'Improve endurance': 'Mejorar Resistencia',
+                    'Build muscle': 'Ganar Músculo',
+                    'Lose weight': 'Perder Peso',
+                    'Increase strength': 'Aumentar Fuerza',
+                    'Keep fit': 'Mantenimiento',
+                    'improve-endurance': 'Mejorar Resistencia',
+                    'build-muscle': 'Ganar Músculo',
+                    'lose-weight': 'Perder Peso',
+                    'increase-strength': 'Aumentar Fuerza',
+                    'keep-fit': 'Mantenimiento',
+                };
+
+                const translatedGoal = goalTranslations[routine.goal] || routine.goal;
+
+                // Use current date instead of the one from OpenAI
+                const currentDate = new Date().toISOString();
+
                 const savedRoutine = await weeklyRoutineApi.create({
-                    weekStarting: routine.weekStarting,
-                    goal: routine.goal,
+                    weekStarting: currentDate,
+                    goal: translatedGoal,
                     days: routine.days,
                     isActive: true,
                     metadata: {
-                        sports: params.sport,
+                        sports: params.sport ? [params.sport] : undefined,
                         level: params.level,
                         generatedBy: 'ai',
                     },

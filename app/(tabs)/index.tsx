@@ -9,6 +9,7 @@ import { useWorkoutStore } from '@/features/workouts/store/useWorkoutStore';
 import { COLORS } from '@/constants/theme';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { ActivityChart } from '@/components/ActivityChart';
+import { RunningGoalProgress } from '@/features/workouts/components/RunningGoalProgress';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DAY_MAP: Record<string, string> = {
@@ -306,6 +307,23 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+
+        {/* Running Goal Progress - Only show if user has a progressive running plan */}
+        {currentWeeklyRoutine?.metadata?.isProgressivePlan && (
+          <View style={[styles.section, { marginTop: 8 }]}>
+            <RunningGoalProgress
+              currentWeek={currentWeeklyRoutine.metadata.currentWeek || 1}
+              totalWeeks={currentWeeklyRoutine.metadata.totalWeeks || 1}
+              targetDistance={currentWeeklyRoutine.metadata.targetDistance || 10}
+              currentMaxDistance={userData?.runningGoal?.currentMaxDistance || 0}
+              weeklyDistance={
+                currentWeeklyRoutine.metadata.fullPlan?.[
+                  (currentWeeklyRoutine.metadata.currentWeek || 1) - 1
+                ]?.totalDistance || 0
+              }
+            />
+          </View>
+        )}
         {/* Today's Workout */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { marginBottom: 24 }]}>

@@ -148,6 +148,93 @@ function calculateGymDuration(workout: GymWorkout): number {
   return workout.totalDuration;
 }
 
+// ============= TRANSLATION UTILITIES =============
+/**
+ * Translate workout titles from English to Spanish
+ */
+function translateWorkoutTitle(title: string): string {
+  const translations: Record<string, string> = {
+    // Boxing titles
+    'Technical Boxing': 'Boxeo Técnico',
+    'Power Boxing': 'Boxeo de Potencia',
+    'Speed Boxing': 'Boxeo de Velocidad',
+    'Endurance Boxing': 'Boxeo de Resistencia',
+    'Boxing Technique': 'Técnica de Boxeo',
+    'Boxing Conditioning': 'Acondicionamiento de Boxeo',
+    'Heavy Bag Work': 'Trabajo de Saco',
+    'Shadow Boxing Session': 'Sesión de Shadow Boxing',
+    'Boxing Fundamentals': 'Fundamentos de Boxeo',
+    'Advanced Boxing': 'Boxeo Avanzado',
+
+    // Running titles
+    'Easy Run': 'Carrera Suave',
+    'Tempo Run': 'Carrera de Tempo',
+    'Interval Training': 'Entrenamiento de Intervalos',
+    'Long Run': 'Carrera Larga',
+    'Recovery Run': 'Carrera de Recuperación',
+    'Speed Work': 'Trabajo de Velocidad',
+    'Endurance Run': 'Carrera de Resistencia',
+
+    // Gym titles
+    'Upper Body Strength': 'Fuerza de Tren Superior',
+    'Lower Body Strength': 'Fuerza de Tren Inferior',
+    'Full Body Workout': 'Entrenamiento de Cuerpo Completo',
+    'Core Strength': 'Fuerza de Core',
+    'Functional Training': 'Entrenamiento Funcional',
+    'HIIT Session': 'Sesión HIIT',
+    'Strength Training': 'Entrenamiento de Fuerza',
+    'Cardio Session': 'Sesión de Cardio',
+    'Circuit Training': 'Entrenamiento en Circuito',
+
+    // Common patterns
+    'Workout': 'Entrenamiento',
+    'Training': 'Entrenamiento',
+    'Session': 'Sesión',
+  };
+
+  // Try exact match first
+  if (translations[title]) {
+    return translations[title];
+  }
+
+  // Try partial matches for common patterns
+  let translatedTitle = title;
+  for (const [english, spanish] of Object.entries(translations)) {
+    if (title.includes(english)) {
+      translatedTitle = translatedTitle.replace(english, spanish);
+    }
+  }
+
+  return translatedTitle;
+}
+
+/**
+ * Translate an entire routine's workout titles
+ */
+function translateRoutine(routine: WeeklyRoutine): WeeklyRoutine {
+  const translatedDays: any = {};
+
+  for (const [dayKey, dayData] of Object.entries(routine.days)) {
+    if (dayData.workout && dayData.workout.title) {
+      translatedDays[dayKey] = {
+        ...dayData,
+        workout: {
+          ...dayData.workout,
+          title: translateWorkoutTitle(dayData.workout.title),
+        },
+      };
+    } else {
+      translatedDays[dayKey] = dayData;
+    }
+  }
+
+  return {
+    ...routine,
+    days: translatedDays,
+  };
+}
+
+
 function validateAndFixWorkoutDuration(workout: Workout): Workout {
   const workoutType = (workout as any).type ||
     ('rounds' in workout ? 'boxing' : 'intervals' in workout ? 'running' : 'gym');
@@ -695,6 +782,8 @@ DÍAS Y EQUIPAMIENTO:
 
       let routine = JSON.parse(content) as WeeklyRoutine;
       routine = WorkoutPostProcessor.process(routine, level);
+      // Translate workout titles to Spanish
+      routine = translateRoutine(routine);
       logger.logGeneration(routine, params, seed);
 
       return routine;
